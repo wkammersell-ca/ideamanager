@@ -2,9 +2,13 @@ var bodyParser = require('body-parser');
 var https = require('https');
 var querystring = require('querystring');
 var fs = require('fs');
+var _ = require('underscore');
 
 var BRIGHTIDEA_ACCESS_TOKEN;
 var TOKEN_FILE_PATH = 'token.txt';
+var UNPLANNED_STATUS_ID = '7CA6F64B-54A6-4FD4-BAD1-00D331A30961';
+var CHIPS_CUTOFF = 5;
+var UPDATED_COUNT = 0;
 
 console.log("Let's get started!");
 console.log("First, let's read token.txt for login info");
@@ -26,7 +30,7 @@ fs.readFile( TOKEN_FILE_PATH, 'utf8', (err, data) => {
 })
 
 function getBrightIdeaTokenFromAutentication( code ){
-	console.log("Conversting code (" + code + ") to a token");
+	console.log("Converting code (" + code + ") to a token");
 	var options = {
 		hostname: 'auth.brightidea.com' ,
 		path: '/_oauth2/token',
@@ -49,7 +53,6 @@ function getBrightIdeaTokenFromAutentication( code ){
 		resDetails.setEncoding( 'utf8' );
 		resDetails.on('data', (d) => {
 			var data = JSON.parse(d);
-			console.log( data );
 			BRIGHTIDEA_ACCESS_TOKEN = data.access_token;
 			writeRefreshTokenToFile( data.refresh_token );
 		});
@@ -88,7 +91,6 @@ function getBrightIdeaTokenFromRefresh( refresh_token ) {
 		resDetails.setEncoding( 'utf8' );
 		resDetails.on('data', (d) => {
 			var data = JSON.parse(d);
-			console.log( data );
 			BRIGHTIDEA_ACCESS_TOKEN = data.access_token;
 			writeRefreshTokenToFile( data.refresh_token );
 		});
@@ -105,26 +107,22 @@ function getBrightIdeaTokenFromRefresh( refresh_token ) {
 function writeRefreshTokenToFile( refresh_token ) {
 	fs.writeFile(TOKEN_FILE_PATH, 'refresh:' + refresh_token, 'utf8', (err) => {
 		if (err) throw err;
-		getOldLowVoteIdeas();
+		getSubmittedIdeas( 1 );
 	});
 };
 
-function getOldLowVoteIdeas(){
-	console.log("Let's get the list of ideas over a year old...");
+function getSubmittedIdeas( page_index ){
+	//console.log("Let's get the list of 'Submitted' ideas (page "+ page_index + ")...");
 	
-	var date = new Date();
-	date.setFullYear( date.getFullYear() - 1);
-	var date_string = (date.getMonth() + 1) + '/' + date.getDate() + '/' +  date.getFullYear();
-
+	var date_cutoff = new Date();
+	date_cutoff.setFullYear( date_cutoff.getFullYear() - 1);
+	
 	var options = {
 		hostname: 'ideas.rallydev.com' ,
-		path: '/api3/idea',
+		path: '/api3/idea?visible=1&status_id=' + UNPLANNED_STATUS_ID +'&order=date_created&page=' + page_index,
 		method: 'GET',
 		headers: {
-			'Authorization': 'Bearer ' + BRIGHTIDEA_ACCESS_TOKEN,
-			//'q': 'date_created <= ' + date_string
-			'q': "date_created = '10/16/2016'",
-			'Content-Type': 'application/x-www-form-urlencoded'
+			'Authorization': 'Bearer ' + BRIGHTIDEA_ACCESS_TOKEN
 		}
 	};
 	
@@ -138,7 +136,28 @@ function getOldLowVoteIdeas(){
 		
 		resDetails.on('end', () => {
 			data = JSON.parse(data);
-			console.log( data );
+			
+			var fetch_other_page = false;
+			
+			_.each(data.idea_list, function( idea ){
+				if ( new Date( idea.date_created ) <= date_cutoff ) {
+					fetch_other_page = true;
+					
+					if( idea.chips <= CHIPS_CUTOFF ) {
+						this.UPDATED_COUNT = this.UPDATED_COUNT + 1;
+						console.log( "Archiving " + idea.idea_code + " submitted on " + idea.date_created + " with " + idea.chips + " chips.");
+					}
+					
+				} else {
+					fetch_other_page = false;
+				}
+			},this);
+			
+			if( fetch_other_page ) {
+				getSubmittedIdeas( page_index + 1 )
+			} else {
+				console.log('Updates are done.');
+			}
 		});
 	} );
 
