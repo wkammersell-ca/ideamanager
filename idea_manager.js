@@ -8,7 +8,7 @@ var BRIGHTIDEA_ACCESS_TOKEN;
 var TOKEN_FILE_PATH = 'token.txt';
 var UNPLANNED_STATUS_ID = '7CA6F64B-54A6-4FD4-BAD1-00D331A30961';
 var CHIPS_CUTOFF = 5;
-var UPDATED_COUNT = 0;
+var COMMENT_TEXT = "Thanks for your idea. I'm archiving it as it has received less than " + CHIPS_CUTOFF + " chips in a year.";
 
 console.log("Let's get started!");
 console.log("First, let's read token.txt for login info");
@@ -107,19 +107,21 @@ function getBrightIdeaTokenFromRefresh( refresh_token ) {
 function writeRefreshTokenToFile( refresh_token ) {
 	fs.writeFile(TOKEN_FILE_PATH, 'refresh:' + refresh_token, 'utf8', (err) => {
 		if (err) throw err;
-		getSubmittedIdeas( 1 );
+		console.log( 'Access Token = ' + BRIGHTIDEA_ACCESS_TOKEN );
+		getSubmittedIdeas( 1, [] );
 	});
 };
 
-function getSubmittedIdeas( page_index ){
-	//console.log("Let's get the list of 'Submitted' ideas (page "+ page_index + ")...");
+function getSubmittedIdeas( page_index, idea_ids ){
+	console.log("Let's get the list of 'Submitted' ideas (page "+ page_index + ")...");
 	
 	var date_cutoff = new Date();
 	date_cutoff.setFullYear( date_cutoff.getFullYear() - 1);
 	
 	var options = {
 		hostname: 'ideas.rallydev.com' ,
-		path: '/api3/idea?visible=1&status_id=' + UNPLANNED_STATUS_ID +'&order=date_created&page=' + page_index,
+		//path: '/api3/idea?visible=1&status_id=' + UNPLANNED_STATUS_ID +'&order=date_created&page_size=50&page=' + page_index,
+		path: '/api3/idea?idea_code=D4186',
 		method: 'GET',
 		headers: {
 			'Authorization': 'Bearer ' + BRIGHTIDEA_ACCESS_TOKEN
@@ -136,27 +138,29 @@ function getSubmittedIdeas( page_index ){
 		
 		resDetails.on('end', () => {
 			data = JSON.parse(data);
+			console.log(data);
 			
 			var fetch_other_page = false;
 			
 			_.each(data.idea_list, function( idea ){
-				if ( new Date( idea.date_created ) <= date_cutoff ) {
+			//	if ( new Date( idea.date_created ) <= date_cutoff ) {
 					fetch_other_page = true;
 					
 					if( idea.chips <= CHIPS_CUTOFF ) {
-						this.UPDATED_COUNT = this.UPDATED_COUNT + 1;
-						console.log( "Archiving " + idea.idea_code + " submitted on " + idea.date_created + " with " + idea.chips + " chips.");
+						idea_ids.push( idea.id );
+						console.log( "Found " + idea.idea_code + " submitted on " + idea.date_created + " with " + idea.chips + " chips.");
 					}
 					
-				} else {
+			//	} else {
 					fetch_other_page = false;
-				}
+			//	}
 			},this);
 			
 			if( fetch_other_page ) {
-				getSubmittedIdeas( page_index + 1 )
+				getSubmittedIdeas( page_index + 1, idea_ids )
 			} else {
-				console.log('Updates are done.');
+				console.log( 'Found ' + idea_ids.length + ' ideas.' );
+				commentIdea( 0, idea_ids );
 			}
 		});
 	} );
@@ -168,3 +172,79 @@ function getSubmittedIdeas( page_index ){
 	req.end();
 };
 
+function commentIdea( index, idea_ids ){
+	console.log('Commenting idea #' + ( index + 1 ) + ' (' + idea_ids[ index ] + ')');
+		
+	var options = {
+		"method": "POST",
+		"hostname": "ideas.rallydev.com",
+		"path": "/api3/comment?idea_id=C2738231-B7A4-4F7A-BAA5-B713EEAEEF55&comment=" + encodeURIComponent( COMMENT_TEXT ),
+		"headers": {
+			"authorization": "Bearer " + BRIGHTIDEA_ACCESS_TOKEN,
+			"content-type": "application/x-www-form-urlencoded",
+		}
+	};
+	
+	var req = https.request( options , resDetails => {
+		resDetails.setEncoding( 'utf8' );
+		
+		var data = '';
+		
+		resDetails.on('data', (d) => {
+			data = data + d;
+		});
+		
+		resDetails.on('end', () => {
+			data = JSON.parse(data);
+//			archiveIdea( index, idea_ids );
+		});
+	} );
+
+	req.on( 'error' , function (e) {
+		console.log( 'problem with request: ' + e.message );
+	} );
+
+	req.end();
+};
+
+function archiveIdea( index, idea_ids ){
+	console.log('Archiving idea #' + ( index + 1 ) + ' (' + idea_ids[ index ] + ')');
+	
+	var comment_text = "Thanks for your idea. I'm archiving it as it has received less than 5 votes in a year.";
+	
+	var options = {
+		"method": "POST",
+		"hostname": "ideas.rallydev.com",
+		"path": "/api3/comment?idea_id=C2738231-B7A4-4F7A-BAA5-B713EEAEEF55&comment=" + encodeURIComponent( comment_text ),
+		"headers": {
+			"authorization": "Bearer " + BRIGHTIDEA_ACCESS_TOKEN,
+			"content-type": "application/x-www-form-urlencoded",
+		}
+	};
+	
+	var payload = {
+		idea_id: 'C2738231-B7A4-4F7A-BAA5-B713EEAEEF55',//idea_ids[ index ],
+		comment: "Thanks for your idea. I'm archiving it as it has received less than 5 votes in a year.",
+	};
+	
+	var req = https.request( options , resDetails => {
+		resDetails.setEncoding( 'utf8' );
+		
+		var data = '';
+		
+		resDetails.on('data', (d) => {
+			data = data + d;
+		});
+		
+		resDetails.on('end', () => {
+			data = JSON.parse(data);
+			archiveIdea( index, idea_ids );
+		});
+	} );
+
+	req.on( 'error' , function (e) {
+		console.log( 'problem with request: ' + e.message );
+	} );
+
+	req.end();
+};
