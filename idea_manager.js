@@ -7,6 +7,7 @@ var _ = require('underscore');
 var BRIGHTIDEA_ACCESS_TOKEN;
 var TOKEN_FILE_PATH = 'token.txt';
 var UNPLANNED_STATUS_ID = '7CA6F64B-54A6-4FD4-BAD1-00D331A30961';
+var ARCHIVED_STATUS_ID = '9AE7A1DB-F3DE-4997-BA82-0BE7987A9ECB';
 var CHIPS_CUTOFF = 5;
 var COMMENT_TEXT = "Thanks for your idea. I'm archiving it as it has received less than " + CHIPS_CUTOFF + " chips in a year.";
 
@@ -107,7 +108,7 @@ function getBrightIdeaTokenFromRefresh( refresh_token ) {
 function writeRefreshTokenToFile( refresh_token ) {
 	fs.writeFile(TOKEN_FILE_PATH, 'refresh:' + refresh_token, 'utf8', (err) => {
 		if (err) throw err;
-		console.log( 'Access Token = ' + BRIGHTIDEA_ACCESS_TOKEN );
+		// console.log( 'Access Token = ' + BRIGHTIDEA_ACCESS_TOKEN );
 		getSubmittedIdeas( 1, [] );
 	});
 };
@@ -138,7 +139,6 @@ function getSubmittedIdeas( page_index, idea_ids ){
 		
 		resDetails.on('end', () => {
 			data = JSON.parse(data);
-			console.log(data);
 			
 			var fetch_other_page = false;
 			
@@ -173,38 +173,42 @@ function getSubmittedIdeas( page_index, idea_ids ){
 };
 
 function commentIdea( index, idea_ids ){
-	console.log('Commenting idea #' + ( index + 1 ) + ' (' + idea_ids[ index ] + ')');
+	if ( index >= idea_ids.length ) {
+		console.log('All done!');
+	} else {
+		console.log('Commenting idea #' + ( index + 1 ) + ' (' + idea_ids[ index ] + ')');
 		
-	var options = {
-		"method": "POST",
-		"hostname": "ideas.rallydev.com",
-		"path": "/api3/comment?idea_id=C2738231-B7A4-4F7A-BAA5-B713EEAEEF55&comment=" + encodeURIComponent( COMMENT_TEXT ),
-		"headers": {
-			"authorization": "Bearer " + BRIGHTIDEA_ACCESS_TOKEN,
-			"content-type": "application/x-www-form-urlencoded",
-		}
-	};
+		var options = {
+			"method": "POST",
+			"hostname": "ideas.rallydev.com",
+			"path": "/api3/comment?idea_id=" + idea_ids[ index ] + "&comment=" + encodeURIComponent( COMMENT_TEXT ),
+			"headers": {
+				"authorization": "Bearer " + BRIGHTIDEA_ACCESS_TOKEN,
+				"content-type": "application/x-www-form-urlencoded",
+			}
+		};
 	
-	var req = https.request( options , resDetails => {
-		resDetails.setEncoding( 'utf8' );
+		var req = https.request( options , resDetails => {
+			resDetails.setEncoding( 'utf8' );
 		
-		var data = '';
+			var data = '';
 		
-		resDetails.on('data', (d) => {
-			data = data + d;
-		});
+			resDetails.on('data', (d) => {
+				data = data + d;
+			});
 		
-		resDetails.on('end', () => {
-			data = JSON.parse(data);
-//			archiveIdea( index, idea_ids );
-		});
-	} );
+			resDetails.on('end', () => {
+				data = JSON.parse(data);
+				archiveIdea( index, idea_ids );
+			});
+		} );
 
-	req.on( 'error' , function (e) {
-		console.log( 'problem with request: ' + e.message );
-	} );
+		req.on( 'error' , function (e) {
+			console.log( 'problem with request: ' + e.message );
+		} );
 
-	req.end();
+		req.end();
+	}
 };
 
 function archiveIdea( index, idea_ids ){
@@ -213,18 +217,13 @@ function archiveIdea( index, idea_ids ){
 	var comment_text = "Thanks for your idea. I'm archiving it as it has received less than 5 votes in a year.";
 	
 	var options = {
-		"method": "POST",
+		"method": "PUT",
 		"hostname": "ideas.rallydev.com",
-		"path": "/api3/comment?idea_id=C2738231-B7A4-4F7A-BAA5-B713EEAEEF55&comment=" + encodeURIComponent( comment_text ),
+		"path": "/api3/idea/" + idea_ids[ index ] + "?status_id=" + ARCHIVED_STATUS_ID,
 		"headers": {
 			"authorization": "Bearer " + BRIGHTIDEA_ACCESS_TOKEN,
 			"content-type": "application/x-www-form-urlencoded",
 		}
-	};
-	
-	var payload = {
-		idea_id: 'C2738231-B7A4-4F7A-BAA5-B713EEAEEF55',//idea_ids[ index ],
-		comment: "Thanks for your idea. I'm archiving it as it has received less than 5 votes in a year.",
 	};
 	
 	var req = https.request( options , resDetails => {
@@ -238,7 +237,7 @@ function archiveIdea( index, idea_ids ){
 		
 		resDetails.on('end', () => {
 			data = JSON.parse(data);
-			archiveIdea( index, idea_ids );
+			commentIdea( index + 1, idea_ids );
 		});
 	} );
 
