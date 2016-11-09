@@ -121,14 +121,16 @@ function writeRefreshTokenToFile( refresh_token ) {
 		if (err) throw err;
 		// console.log( 'Access Token = ' + BRIGHTIDEA_ACCESS_TOKEN );
 		if ( _.contains( process.argv, ARCHIVE_OLD_WITH_LOW_CHIPS_ARG  ) ) {
-			getSubmittedIdeas( 1, [] );
+			getOldSubmittedIdeas( 1, [] );
+		} else if ( _.contains( process.argv, CREATE_REVIEW_LIST_ARG  ) ) {
+			getNewSubmittedIdeas( 1, [] );
 		} else {
 			console.log( 'Error: no script given. Options are ' + ARCHIVE_OLD_WITH_LOW_CHIPS_ARG + ' or ' + CREATE_REVIEW_LIST_ARG );
 		}
 	});
 };
 
-function getSubmittedIdeas( page_index, idea_ids ){
+function getOldSubmittedIdeas( page_index, idea_ids ){
 	console.log("Let's get the list of 'Submitted' ideas (page "+ page_index + ")...");
 	
 	var date_cutoff = new Date();
@@ -136,7 +138,9 @@ function getSubmittedIdeas( page_index, idea_ids ){
 	
 	var options = {
 		hostname: 'ideas.rallydev.com' ,
-		path: '/api3/idea?visible=1&status_id=' + UNPLANNED_STATUS_ID +'&order=date_created&page_size=50&page=' + page_index,
+		path: '/api3/idea?visible=1&status_id=' + UNPLANNED_STATUS_ID +
+			'&order=' + encodeURIComponent('date_created ASC') +
+			'&page_size=50&page=' + page_index,
 		//path: '/api3/idea?idea_code=D4186',
 		method: 'GET',
 		headers: {
@@ -172,7 +176,7 @@ function getSubmittedIdeas( page_index, idea_ids ){
 			},this);
 			
 			if( fetch_other_page ) {
-				getSubmittedIdeas( page_index + 1, idea_ids )
+				getOldSubmittedIdeas( page_index + 1, idea_ids );
 			} else {
 				console.log( 'Found ' + idea_ids.length + ' ideas.' );
 				if ( _.contains( process.argv, SAFE_MODE_ARG  ) ) {
@@ -257,6 +261,68 @@ function archiveIdea( index, idea_ids ){
 		resDetails.on('end', () => {
 			data = JSON.parse(data);
 			commentIdea( index + 1, idea_ids );
+		});
+	} );
+
+	req.on( 'error' , function (e) {
+		console.log( 'problem with request: ' + e.message );
+	} );
+
+	req.end();
+};
+
+function getNewSubmittedIdeas( page_index, ideas ){
+	console.log("Let's get the list of 'Submitted' ideas (page "+ page_index + ")...");
+	
+	var date_cutoff = new Date();
+	date_cutoff.setFullYear( date_cutoff.getFullYear() - 1);
+	
+	var options = {
+		hostname: 'ideas.rallydev.com' ,
+		path: '/api3/idea?visible=1&status_id=' + UNPLANNED_STATUS_ID +
+			'&order=' + encodeURIComponent('date_created DESC') +
+			'&page_size=50&page=' + page_index,
+		method: 'GET',
+		headers: {
+			'Authorization': 'Bearer ' + BRIGHTIDEA_ACCESS_TOKEN
+		}
+	};
+	
+	var req = https.request( options , resDetails => {
+		resDetails.setEncoding( 'utf8' );
+		var data = '';
+		
+		resDetails.on('data', (d) => {
+			data = data + d;
+		});
+		
+		resDetails.on('end', () => {
+			data = JSON.parse(data);
+			
+			var fetch_other_page = false;
+			
+			_.each(data.idea_list, function( idea ){
+				if ( new Date( idea.date_created ) >= date_cutoff ) {
+					fetch_other_page = true;
+					ideas.push( idea );
+					console.log( "Found " + idea.idea_code +
+						" submitted on " + idea.date_created +
+						" with " + idea.chips + " chips.");
+				} else {
+					fetch_other_page = false;
+				}
+			},this);
+			
+			if( fetch_other_page ) {
+				getNewSubmittedIdeas( page_index + 1, ideas );
+			} else {
+				console.log( 'Found ' + ideas.length + ' ideas.' );
+				if ( _.contains( process.argv, SAFE_MODE_ARG  ) ) {
+					console.log( 'Done [SAFE MODE]' );
+				} else {
+					//commentIdea( 0, idea_ids );
+				}
+			}
 		});
 	} );
 
