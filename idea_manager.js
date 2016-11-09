@@ -6,6 +6,7 @@ var _ = require('underscore');
 
 var BRIGHTIDEA_ACCESS_TOKEN;
 var TOKEN_FILE_PATH = 'token.txt';
+var BRIGHTIDEA_HOST = 'rallydev.brightidea.com';
 
 var SAFE_MODE_ARG = '--safe';
 var ARCHIVE_OLD_WITH_LOW_CHIPS_ARG = '--archive_old_low_chips';
@@ -16,7 +17,7 @@ var ARCHIVED_STATUS_ID = '9AE7A1DB-F3DE-4997-BA82-0BE7987A9ECB';
 
 // vars for archiving old ideas with low chips
 var CHIPS_CUTOFF = 5;
-var COMMENT_TEXT = "Thanks for your idea. I'm archiving it as it has received less than " + CHIPS_CUTOFF + " chips in a year.";
+var COMMENT_TEXT = "I'm archiving this as it has less than " + CHIPS_CUTOFF + " chips in a year. Please resubmit if you still want this.";
 
 // vars for creating review lists
 var MAX_IDEAS = 2;
@@ -137,11 +138,11 @@ function getOldSubmittedIdeas( page_index, idea_ids ){
 	date_cutoff.setFullYear( date_cutoff.getFullYear() - 1);
 	
 	var options = {
-		hostname: 'ideas.rallydev.com' ,
+		hostname: BRIGHTIDEA_HOST,
 		path: '/api3/idea?visible=1&status_id=' + UNPLANNED_STATUS_ID +
 			'&order=' + encodeURIComponent('date_created ASC') +
 			'&page_size=50&page=' + page_index,
-		//path: '/api3/idea?idea_code=D4186',
+		//path: '/api3/idea?idea_code=D4186', // Test Idea for playing with scripts
 		method: 'GET',
 		headers: {
 			'Authorization': 'Bearer ' + BRIGHTIDEA_ACCESS_TOKEN
@@ -162,7 +163,7 @@ function getOldSubmittedIdeas( page_index, idea_ids ){
 			var fetch_other_page = false;
 			
 			_.each(data.idea_list, function( idea ){
-				if ( new Date( idea.date_created ) <= date_cutoff ) {
+			//	if ( new Date( idea.date_created ) <= date_cutoff ) {
 					fetch_other_page = true;
 					
 					if( idea.chips <= CHIPS_CUTOFF ) {
@@ -170,21 +171,22 @@ function getOldSubmittedIdeas( page_index, idea_ids ){
 						console.log( "Found " + idea.idea_code + " submitted on " + idea.date_created + " with " + idea.chips + " chips.");
 					}
 					
-				} else {
+			//	} else {
 					fetch_other_page = false;
-				}
+			//	}
 			},this);
 			
-			if( fetch_other_page ) {
-				getOldSubmittedIdeas( page_index + 1, idea_ids );
-			} else {
+		//	if( fetch_other_page ) {
+		//		getOldSubmittedIdeas( page_index + 1, idea_ids );
+		//	} else {
 				console.log( 'Found ' + idea_ids.length + ' ideas.' );
 				if ( _.contains( process.argv, SAFE_MODE_ARG  ) ) {
 					console.log( 'Done [SAFE MODE]' );
 				} else {
 					commentIdea( 0, idea_ids );
+				//	archiveIdea( 0, idea_ids );
 				}
-			}
+		//	}
 		});
 	} );
 
@@ -203,8 +205,9 @@ function commentIdea( index, idea_ids ){
 		
 		var options = {
 			"method": "POST",
-			"hostname": "ideas.rallydev.com",
-			"path": "/api3/comment?idea_id=" + idea_ids[ index ] + "&comment=" + encodeURIComponent( COMMENT_TEXT ),
+			"hostname": BRIGHTIDEA_HOST,
+			"path": "/api3/comment?idea_id=" + encodeURIComponent( idea_ids[ index ] ) +
+				"&comment=" + encodeURIComponent( COMMENT_TEXT ),
 			"headers": {
 				"authorization": "Bearer " + BRIGHTIDEA_ACCESS_TOKEN,
 				"content-type": "application/x-www-form-urlencoded",
@@ -237,12 +240,11 @@ function commentIdea( index, idea_ids ){
 function archiveIdea( index, idea_ids ){
 	console.log('Archiving idea #' + ( index + 1 ) + ' (' + idea_ids[ index ] + ')');
 	
-	var comment_text = "Thanks for your idea. I'm archiving it as it has received less than 5 votes in a year.";
-	
 	var options = {
 		"method": "PUT",
-		"hostname": "ideas.rallydev.com",
-		"path": "/api3/idea/" + idea_ids[ index ] + "?status_id=" + ARCHIVED_STATUS_ID,
+		"hostname": BRIGHTIDEA_HOST,
+		"path": "/api3/idea/" + encodeURIComponent( idea_ids[ index ] ) +
+			"?status_id=" + encodeURIComponent( ARCHIVED_STATUS_ID ),
 		"headers": {
 			"authorization": "Bearer " + BRIGHTIDEA_ACCESS_TOKEN,
 			"content-type": "application/x-www-form-urlencoded",
@@ -278,7 +280,7 @@ function getNewSubmittedIdeas( page_index, ideas ){
 	date_cutoff.setFullYear( date_cutoff.getFullYear() - 1);
 	
 	var options = {
-		hostname: 'ideas.rallydev.com' ,
+		hostname: BRIGHTIDEA_HOST,
 		path: '/api3/idea?visible=1&status_id=' + UNPLANNED_STATUS_ID +
 			'&order=' + encodeURIComponent('date_created DESC') +
 			'&page_size=50&page=' + page_index,
