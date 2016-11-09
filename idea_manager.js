@@ -6,10 +6,21 @@ var _ = require('underscore');
 
 var BRIGHTIDEA_ACCESS_TOKEN;
 var TOKEN_FILE_PATH = 'token.txt';
+
+var SAFE_MODE_ARG = '--safe';
+var ARCHIVE_OLD_WITH_LOW_CHIPS_ARG = '--archive_old_low_chips';
+var CREATE_REVIEW_LIST_ARG = '--create_review_list';
+
 var UNPLANNED_STATUS_ID = '7CA6F64B-54A6-4FD4-BAD1-00D331A30961';
 var ARCHIVED_STATUS_ID = '9AE7A1DB-F3DE-4997-BA82-0BE7987A9ECB';
+
+// vars for archiving old ideas with low chips
 var CHIPS_CUTOFF = 5;
 var COMMENT_TEXT = "Thanks for your idea. I'm archiving it as it has received less than " + CHIPS_CUTOFF + " chips in a year.";
+
+// vars for creating review lists
+var MAX_IDEAS = 15;
+var REVIEWS = ['William', 'Mia', 'Steph', 'Andrea', 'Marianne'];
 
 console.log("Let's get started!");
 console.log("First, let's read token.txt for login info");
@@ -28,7 +39,7 @@ fs.readFile( TOKEN_FILE_PATH, 'utf8', (err, data) => {
 	} else {
 		getBrightIdeaTokenFromRefresh( code );
 	}
-})
+});
 
 function getBrightIdeaTokenFromAutentication( code ){
 	console.log("Converting code (" + code + ") to a token");
@@ -109,7 +120,11 @@ function writeRefreshTokenToFile( refresh_token ) {
 	fs.writeFile(TOKEN_FILE_PATH, 'refresh:' + refresh_token, 'utf8', (err) => {
 		if (err) throw err;
 		// console.log( 'Access Token = ' + BRIGHTIDEA_ACCESS_TOKEN );
-		getSubmittedIdeas( 1, [] );
+		if ( _.contains( process.argv, ARCHIVE_OLD_WITH_LOW_CHIPS_ARG  ) ) {
+			getSubmittedIdeas( 1, [] );
+		} else {
+			console.log( 'Error: no script given. Options are ' + ARCHIVE_OLD_WITH_LOW_CHIPS_ARG + ' or ' + CREATE_REVIEW_LIST_ARG );
+		}
 	});
 };
 
@@ -121,8 +136,8 @@ function getSubmittedIdeas( page_index, idea_ids ){
 	
 	var options = {
 		hostname: 'ideas.rallydev.com' ,
-		//path: '/api3/idea?visible=1&status_id=' + UNPLANNED_STATUS_ID +'&order=date_created&page_size=50&page=' + page_index,
-		path: '/api3/idea?idea_code=D4186',
+		path: '/api3/idea?visible=1&status_id=' + UNPLANNED_STATUS_ID +'&order=date_created&page_size=50&page=' + page_index,
+		//path: '/api3/idea?idea_code=D4186',
 		method: 'GET',
 		headers: {
 			'Authorization': 'Bearer ' + BRIGHTIDEA_ACCESS_TOKEN
@@ -143,7 +158,7 @@ function getSubmittedIdeas( page_index, idea_ids ){
 			var fetch_other_page = false;
 			
 			_.each(data.idea_list, function( idea ){
-			//	if ( new Date( idea.date_created ) <= date_cutoff ) {
+				if ( new Date( idea.date_created ) <= date_cutoff ) {
 					fetch_other_page = true;
 					
 					if( idea.chips <= CHIPS_CUTOFF ) {
@@ -151,16 +166,20 @@ function getSubmittedIdeas( page_index, idea_ids ){
 						console.log( "Found " + idea.idea_code + " submitted on " + idea.date_created + " with " + idea.chips + " chips.");
 					}
 					
-			//	} else {
+				} else {
 					fetch_other_page = false;
-			//	}
+				}
 			},this);
 			
 			if( fetch_other_page ) {
 				getSubmittedIdeas( page_index + 1, idea_ids )
 			} else {
 				console.log( 'Found ' + idea_ids.length + ' ideas.' );
-				commentIdea( 0, idea_ids );
+				if ( _.contains( process.argv, SAFE_MODE_ARG  ) ) {
+					console.log( 'Done [SAFE MODE]' );
+				} else {
+					commentIdea( 0, idea_ids );
+				}
 			}
 		});
 	} );
