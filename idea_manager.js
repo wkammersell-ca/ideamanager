@@ -19,8 +19,8 @@ var CHIPS_CUTOFF = 5;
 var COMMENT_TEXT = "Thanks for your idea. I'm archiving it as it has received less than " + CHIPS_CUTOFF + " chips in a year.";
 
 // vars for creating review lists
-var MAX_IDEAS = 15;
-var REVIEWS = ['William', 'Mia', 'Steph', 'Andrea', 'Marianne'];
+var MAX_IDEAS = 2;
+var REVIEWERS = ['William', 'Mia', 'Steph', 'Andrea', 'Marianne'];
 
 console.log("Let's get started!");
 console.log("First, let's read token.txt for login info");
@@ -317,10 +317,12 @@ function getNewSubmittedIdeas( page_index, ideas ){
 				getNewSubmittedIdeas( page_index + 1, ideas );
 			} else {
 				console.log( 'Found ' + ideas.length + ' ideas.' );
-				if ( _.contains( process.argv, SAFE_MODE_ARG  ) ) {
-					console.log( 'Done [SAFE MODE]' );
+				if ( ideas.length >= ( MAX_IDEAS * REVIEWERS ) ) {
+					divvyIdeas( ideas, {} );
 				} else {
-					//commentIdea( 0, idea_ids );
+					//TODO: Implement looking for old ideas by top-chips
+					console.log( 'Warning: We need more ideas!' );
+					divvyIdeas( ideas, {} );
 				}
 			}
 		});
@@ -332,3 +334,24 @@ function getNewSubmittedIdeas( page_index, ideas ){
 
 	req.end();
 };
+
+function divvyIdeas( ideas, ideas_by_reviewer ){
+	if( Object.keys( ideas_by_reviewer).length == 0 ) {
+		_.each( REVIEWERS, function( reviewer ){
+			ideas_by_reviewer[ reviewer ] = [];
+		}, this);
+	}
+	
+	console.log( ideas_by_reviewer );
+	
+	var index = 0;
+	_.each( ideas, function( idea ) {
+		var reviwer_ideas = ideas_by_reviewer[ REVIEWERS[ index % REVIEWERS.length ] ];
+		if( reviwer_ideas.length < MAX_IDEAS ) {
+			reviwer_ideas.push( idea );
+		}
+		index++;
+	}, this );
+	
+	console.log( ideas_by_reviewer );
+}
