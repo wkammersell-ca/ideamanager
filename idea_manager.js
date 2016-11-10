@@ -20,8 +20,9 @@ var CHIPS_CUTOFF = 5;
 var COMMENT_TEXT = "I'm archiving this as it has less than " + CHIPS_CUTOFF + " chips in a year. Please resubmit if you still want this.";
 
 // vars for creating review lists
-var MAX_IDEAS = 2;
+var MAX_IDEAS = 15;
 var REVIEWERS = ['William', 'Mia', 'Steph', 'Andrea', 'Marianne'];
+var REVIEW_LIST_FILTE_PATH = 'review_list.tsv';
 
 console.log("Let's get started!");
 console.log("First, let's read token.txt for login info");
@@ -344,8 +345,6 @@ function divvyIdeas( ideas, ideas_by_reviewer ){
 		}, this);
 	}
 	
-	console.log( ideas_by_reviewer );
-	
 	var index = 0;
 	_.each( ideas, function( idea ) {
 		var reviwer_ideas = ideas_by_reviewer[ REVIEWERS[ index % REVIEWERS.length ] ];
@@ -355,5 +354,46 @@ function divvyIdeas( ideas, ideas_by_reviewer ){
 		index++;
 	}, this );
 	
-	console.log( ideas_by_reviewer );
-}
+	outputReviewList( ideas_by_reviewer );
+};
+
+function outputReviewList( ideas_by_reviewer ) {
+	var write_buffer = [
+		'Reviewer',
+		'Idea Code',
+		'Category',
+		'Date Created',
+		'Submitter',
+		'Title',
+		'Description',
+		'Status',
+		'Chips',
+		'Comments',
+		'URL'
+	].join( '	');
+	
+	_.each( REVIEWERS, function( reviewer ){
+		_.each( ideas_by_reviewer[ reviewer ], function ( idea ) {
+			write_buffer += String.fromCharCode(13); //new line
+			write_buffer += [
+				reviewer,
+				idea.idea_code,
+				idea.category.name,
+				idea.date_created,
+				idea.member.screen_name,
+				idea.title,
+				idea.description,
+				idea.status.name,
+				idea.chips,
+				idea.comment_count,
+				idea.url
+			].join('	');
+		}, this );	
+	}, this );
+	
+	
+	fs.writeFile(REVIEW_LIST_FILTE_PATH, write_buffer, 'utf8', (err) => {
+		if (err) throw err;
+		console.log('Review List written to: ' + REVIEW_LIST_FILTE_PATH );
+	});
+};
