@@ -21,7 +21,7 @@ var COMMENT_TEXT = "I'm archiving this as it has less than " + CHIPS_CUTOFF + " 
 
 // vars for creating review lists
 var MAX_IDEAS = 15;
-var REVIEWERS = ['William', 'Mia', 'Steph', 'Andrea', 'Marianne'];
+var REVIEWERS = [ 'Andrea', 'Marianne', 'Mia', 'Steph', 'William' ];
 var REVIEW_LIST_FILTE_PATH = 'review_list.tsv';
 
 console.log("Let's get started!");
@@ -320,7 +320,7 @@ function getNewSubmittedIdeas( page_index, ideas ){
 				getNewSubmittedIdeas( page_index + 1, ideas );
 			} else {
 				console.log( 'Found ' + ideas.length + ' ideas.' );
-				if ( ideas.length >= ( MAX_IDEAS * REVIEWERS ) ) {
+				if ( ideas.length >= ( MAX_IDEAS * REVIEWERS.length ) ) {
 					divvyIdeas( ideas, {} );
 				} else {
 					//TODO: Implement looking for old ideas by top-chips
