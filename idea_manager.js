@@ -7,6 +7,7 @@ var _ = require('underscore');
 var BRIGHTIDEA_ACCESS_TOKEN;
 var TOKEN_FILE_PATH = 'token.txt';
 var BRIGHTIDEA_HOST = 'rallydev.brightidea.com';
+var BRIGHTIDEA_RENAMED_HOST = 'ideas.rallydev.com';
 
 var SAFE_MODE_ARG = '--safe';
 var ARCHIVE_OLD_WITH_LOW_CHIPS_ARG = '--archive_old_low_chips';
@@ -16,7 +17,7 @@ var SUBMITTED_STATUS_ID = '7CA6F64B-54A6-4FD4-BAD1-00D331A30961';
 var ARCHIVED_STATUS_ID = '9AE7A1DB-F3DE-4997-BA82-0BE7987A9ECB';
 
 // vars for archiving old ideas with low chips
-var CHIPS_CUTOFF = 4;
+var CHIPS_CUTOFF = 0;
 var COMMENT_TEXT = "I'm archiving this as it has " + CHIPS_CUTOFF + " or less chips in a year. Please resubmit if you still want this.";
 
 // vars for creating review lists
@@ -164,7 +165,7 @@ function getOldSubmittedIdeas( page_index, idea_ids ){
 			var fetch_other_page = false;
 			
 			_.each(data.idea_list, function( idea ){
-			//	if ( new Date( idea.date_created ) <= date_cutoff ) {
+				if ( new Date( idea.date_created ) <= date_cutoff ) {
 					fetch_other_page = true;
 					
 					if( idea.chips <= CHIPS_CUTOFF ) {
@@ -172,22 +173,21 @@ function getOldSubmittedIdeas( page_index, idea_ids ){
 						console.log( "Found " + idea.idea_code + " submitted on " + idea.date_created + " with " + idea.chips + " chips.");
 					}
 					
-			//	} else {
+				} else {
 					fetch_other_page = false;
-			//	}
+				}
 			},this);
 			
-		//	if( fetch_other_page ) {
-		//		getOldSubmittedIdeas( page_index + 1, idea_ids );
-		//	} else {
+			if( fetch_other_page ) {
+				getOldSubmittedIdeas( page_index + 1, idea_ids );
+			} else {
 				console.log( 'Found ' + idea_ids.length + ' ideas.' );
 				if ( _.contains( process.argv, SAFE_MODE_ARG  ) ) {
 					console.log( 'Done [SAFE MODE]' );
 				} else {
 					commentIdea( 0, idea_ids );
-				//	archiveIdea( 0, idea_ids );
 				}
-		//	}
+			}
 		});
 	} );
 
@@ -440,7 +440,7 @@ function outputReviewList( ideas_by_reviewer ) {
 				idea.status.name,
 				idea.chips,
 				idea.comment_count,
-				idea.url
+				idea.url.replace( BRIGHTIDEA_HOST, BRIGHTIDEA_RENAMED_HOST )
 			].join('	');
 		}, this );	
 	}, this );
