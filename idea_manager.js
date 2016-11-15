@@ -17,7 +17,7 @@ var SUBMITTED_STATUS_ID = '7CA6F64B-54A6-4FD4-BAD1-00D331A30961';
 var ARCHIVED_STATUS_ID = '9AE7A1DB-F3DE-4997-BA82-0BE7987A9ECB';
 
 // vars for archiving old ideas with low chips
-var CHIPS_CUTOFF = 0;
+var CHIPS_CUTOFF = 3;
 var COMMENT_TEXT = "I'm archiving this as it has " + CHIPS_CUTOFF + " or less chips in a year. Please resubmit if you still want this.";
 
 // vars for creating review lists
