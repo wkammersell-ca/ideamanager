@@ -14,6 +14,7 @@ var ARCHIVE_OLD_WITH_LOW_CHIPS_ARG = '--archive_old_low_chips';
 var CREATE_REVIEW_LIST_ARG = '--create_review_list';
 
 var SUBMITTED_STATUS_ID = '7CA6F64B-54A6-4FD4-BAD1-00D331A30961';
+var NOT_PLANNED_STATUS_ID = 'A5C1C89E-46CB-4234-B348-A6B44E80E0BD';
 var ARCHIVED_STATUS_ID = '9AE7A1DB-F3DE-4997-BA82-0BE7987A9ECB';
 
 // vars for archiving old ideas with low chips
@@ -144,7 +145,6 @@ function getOldSubmittedIdeas( page_index, idea_ids ){
 		path: '/api3/idea?visible=1&status_id=' + SUBMITTED_STATUS_ID +
 			'&order=' + encodeURIComponent('date_created ASC') +
 			'&page_size=50&page=' + page_index,
-		//path: '/api3/idea?idea_code=D4186', // Test Idea for playing with scripts
 		method: 'GET',
 		headers: {
 			'Authorization': 'Bearer ' + BRIGHTIDEA_ACCESS_TOKEN
@@ -161,7 +161,6 @@ function getOldSubmittedIdeas( page_index, idea_ids ){
 		
 		resDetails.on('end', () => {
 			data = JSON.parse(data);
-			
 			var fetch_other_page = false;
 			
 			_.each(data.idea_list, function( idea ){
@@ -338,18 +337,19 @@ function getNewSubmittedIdeas( page_index, ideas ){
 
 function getTopVotedSubmittedIdeas( page_index, ideas ){
 	console.log("Let's get the top voted 'Submitted' ideas (page "+ page_index + ")...");
+	var page_size = 50;
 	
 	var options = {
 		hostname: BRIGHTIDEA_HOST,
 		path: '/api3/idea?visible=1&status_id=' + SUBMITTED_STATUS_ID +
 			'&order=' + encodeURIComponent('chips DESC') +
-			'&page_size=50&page=' + page_index,
+			'&page_size=' + page_size + '&page=' + page_index,
 		method: 'GET',
 		headers: {
 			'Authorization': 'Bearer ' + BRIGHTIDEA_ACCESS_TOKEN
 		}
 	};
-	
+		
 	var req = https.request( options , resDetails => {
 		resDetails.setEncoding( 'utf8' );
 		var data = '';
@@ -364,14 +364,18 @@ function getTopVotedSubmittedIdeas( page_index, ideas ){
 			var fetch_other_page = false;
 			
 			_.each(data.idea_list, function( idea ){
-				ideas.push( idea );
-				console.log( "Found " + idea.idea_code +
-					" submitted on " + idea.date_created +
-					" with " + idea.chips + " chips.");
+				if( idea.chips > CHIPS_CUTOFF ) {
+					ideas.push( idea );
+					console.log( "Found " + idea.idea_code +
+						" submitted on " + idea.date_created +
+						" with " + idea.chips + " chips.");
+					fetch_other_page = true;
+				} else {
+					fetch_other_page = false;
+				}
 			},this);
 			
-			if( ideas.length < ( MAX_IDEAS * REVIEWERS.length ) ) {
-				//TODO - Check if there are no ideas left
+			if( ( ideas.length < ( MAX_IDEAS * REVIEWERS.length ) ) && ( fetch_other_page ) ) {
 				getTopVotedSubmittedIdeas( page_index + 1, ideas );
 			} else {
 				console.log( 'Found ' + ideas.length + ' ideas.' );
