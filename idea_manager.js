@@ -404,6 +404,75 @@ function getTopVotedSubmittedIdeas( page_index, ideas ){
 				if ( ideas.length >= ( MAX_IDEAS * REVIEWERS.length ) ) {
 					divvyIdeas( ideas, {} );
 				} else {
+					getTopVotedOldNotPlannedIdeas( 1, ideas );
+				}
+			}
+		});
+	} );
+
+	req.on( 'error' , function (e) {
+		console.log( 'problem with request: ' + e.message );
+	} );
+
+	req.end();
+};
+
+function getTopVotedOldNotPlannedIdeas( page_index, ideas ){
+	console.log("Let's get the top voted 'Not Planned' ideas that haven't been updated in a year (page "+ page_index + ")...");
+	var page_size = 50;
+	
+	var date_cutoff = new Date();
+	date_cutoff.setFullYear( date_cutoff.getFullYear() - 1);
+	
+	var options = {
+		hostname: BRIGHTIDEA_HOST,
+		path: '/api3/idea?visible=1&status_id=' + NOT_PLANNED_STATUS_ID +
+			'&order=' + encodeURIComponent('chips DESC') +
+			'&page_size=' + page_size + '&page=' + page_index,
+		method: 'GET',
+		headers: {
+			'Authorization': 'Bearer ' + BRIGHTIDEA_ACCESS_TOKEN
+		}
+	};
+		
+	var req = https.request( options , resDetails => {
+		resDetails.setEncoding( 'utf8' );
+		var data = '';
+		
+		resDetails.on('data', (d) => {
+			data = data + d;
+		});
+		
+		resDetails.on('end', () => {
+			data = JSON.parse(data);
+			
+			var fetch_other_page = false;
+			
+			_.each(data.idea_list, function( idea ){
+				if( idea.chips > CHIPS_CUTOFF ) {
+					fetch_other_page = true;
+					if( IGNORE_LIST.indexOf( idea.idea_code ) == -1 ) {
+						IGNORE_LIST.push( idea.idea_code );
+						
+						if ( new Date( idea.date_modified ) <= date_cutoff ) {
+							ideas.push( idea );
+							console.log( "Found " + idea.idea_code +
+								" modified on " + idea.date_modified +
+								" with " + idea.chips + " chips.");
+						}
+					}
+				} else {
+					fetch_other_page = false;
+				}
+			},this);
+			
+			if( ( ideas.length < ( MAX_IDEAS * REVIEWERS.length ) ) && ( fetch_other_page ) ) {
+				getTopVotedOldNotPlannedIdeas( page_index + 1, ideas );
+			} else {
+				console.log( 'Found ' + ideas.length + ' ideas.' );
+				if ( ideas.length >= ( MAX_IDEAS * REVIEWERS.length ) ) {
+					divvyIdeas( ideas, {} );
+				} else {
 					console.log( 'Warning: We need more ideas!' );
 					divvyIdeas( ideas, {} );
 				}
@@ -462,7 +531,7 @@ function outputReviewList( ideas_by_reviewer ) {
 				idea.date_created,
 				idea.member.screen_name,
 				idea.title,
-				idea.description,
+				idea.description.replace(/\n/g, ''),
 				idea.status.name,
 				idea.chips,
 				idea.comment_count,
