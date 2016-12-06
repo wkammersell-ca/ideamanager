@@ -5,7 +5,9 @@ var fs = require('fs');
 var _ = require('underscore');
 
 var BRIGHTIDEA_ACCESS_TOKEN;
+var IGNORE_LIST = [];
 var TOKEN_FILE_PATH = 'token.txt';
+var IGNORE_FILE_PATH = 'ignore.txt';
 var BRIGHTIDEA_HOST = 'rallydev.brightidea.com';
 var BRIGHTIDEA_RENAMED_HOST = 'ideas.rallydev.com';
 
@@ -29,21 +31,35 @@ var REVIEW_LIST_FILTE_PATH = 'review_list.tsv';
 console.log("Let's get started!");
 console.log("First, let's read token.txt for login info");
 
-fs.readFile( TOKEN_FILE_PATH, 'utf8', (err, data) => {
+// Initialize Ignore List
+fs.readFile( IGNORE_FILE_PATH, 'utf8', (err, data) => {
 	if (err) {
 		throw err;
 	}
 	
-	// Assumes token.txt is the format type.code
-	var code = data.split(':')[1];
+	// Assumes ignore list is the format of one ID per line
+	IGNORE_LIST = data.split('\n');
 	
-	if( data.startsWith('authorization') ) {
-		console.log("Let's convert an authorization code to a token");	
-		getBrightIdeaTokenFromAutentication( code );
-	} else {
-		getBrightIdeaTokenFromRefresh( code );
-	}
+	readTokenFile();
 });
+
+function readTokenFile(){
+	fs.readFile( TOKEN_FILE_PATH, 'utf8', (err, data) => {
+		if (err) {
+			throw err;
+		}
+	
+		// Assumes token file is the format type.code
+		var code = data.split(':')[1];
+	
+		if( data.startsWith('authorization') ) {
+			console.log("Let's convert an authorization code to a token");	
+			getBrightIdeaTokenFromAutentication( code );
+		} else {
+			getBrightIdeaTokenFromRefresh( code );
+		}
+	});
+};
 
 function getBrightIdeaTokenFromAutentication( code ){
 	console.log("Converting code (" + code + ") to a token");
@@ -306,10 +322,13 @@ function getNewSubmittedIdeas( page_index, ideas ){
 			_.each(data.idea_list, function( idea ){
 				if ( new Date( idea.date_created ) >= date_cutoff ) {
 					fetch_other_page = true;
-					ideas.push( idea );
-					console.log( "Found " + idea.idea_code +
-						" submitted on " + idea.date_created +
-						" with " + idea.chips + " chips.");
+					if( IGNORE_LIST.indexOf( idea.idea_code ) == -1 ) {
+						IGNORE_LIST.push( idea.idea_code );
+						ideas.push( idea );
+						console.log( "Found " + idea.idea_code +
+							" submitted on " + idea.date_created +
+							" with " + idea.chips + " chips.");
+					}
 				} else {
 					fetch_other_page = false;
 				}
@@ -365,11 +384,14 @@ function getTopVotedSubmittedIdeas( page_index, ideas ){
 			
 			_.each(data.idea_list, function( idea ){
 				if( idea.chips > CHIPS_CUTOFF ) {
-					ideas.push( idea );
-					console.log( "Found " + idea.idea_code +
-						" submitted on " + idea.date_created +
-						" with " + idea.chips + " chips.");
 					fetch_other_page = true;
+					if( IGNORE_LIST.indexOf( idea.idea_code ) == -1 ) {
+						IGNORE_LIST.push( idea.idea_code );
+						ideas.push( idea );
+						console.log( "Found " + idea.idea_code +
+							" submitted on " + idea.date_created +
+							" with " + idea.chips + " chips.");
+					}
 				} else {
 					fetch_other_page = false;
 				}
