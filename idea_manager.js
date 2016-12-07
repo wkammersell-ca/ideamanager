@@ -12,12 +12,15 @@ var BRIGHTIDEA_HOST = 'rallydev.brightidea.com';
 var BRIGHTIDEA_RENAMED_HOST = 'ideas.rallydev.com';
 
 var SAFE_MODE_ARG = '--safe';
-var ARCHIVE_OLD_WITH_LOW_CHIPS_ARG = '--archive_old_low_chips';
+var ARCHIVE_OLD_WITH_LOW_CHIPS_ARG = '--archive_ideas';
 var CREATE_REVIEW_LIST_ARG = '--create_review_list';
 
 var SUBMITTED_STATUS_ID = '7CA6F64B-54A6-4FD4-BAD1-00D331A30961';
 var NOT_PLANNED_STATUS_ID = 'A5C1C89E-46CB-4234-B348-A6B44E80E0BD';
 var ARCHIVED_STATUS_ID = '9AE7A1DB-F3DE-4997-BA82-0BE7987A9ECB';
+
+var THIS_YEAR = 'this_year';
+var YEAR_OLD = 'year_old';
 
 // vars for archiving old ideas with low chips
 var CHIPS_CUTOFF = 7;
@@ -33,9 +36,7 @@ console.log("First, let's read token.txt for login info");
 
 // Initialize Ignore List
 fs.readFile( IGNORE_FILE_PATH, 'utf8', (err, data) => {
-	if (err) {
-		throw err;
-	}
+	if (err) { throw err; }
 	
 	// Assumes ignore list is the format of one ID per line
 	IGNORE_LIST = data.split('\n');
@@ -45,9 +46,7 @@ fs.readFile( IGNORE_FILE_PATH, 'utf8', (err, data) => {
 
 function readTokenFile(){
 	fs.readFile( TOKEN_FILE_PATH, 'utf8', (err, data) => {
-		if (err) {
-			throw err;
-		}
+		if (err) { throw err; }
 	
 		// Assumes token file is the format type.code
 		var code = data.split(':')[1];
@@ -143,7 +142,7 @@ function writeRefreshTokenToFile( refresh_token ) {
 		if ( _.contains( process.argv, ARCHIVE_OLD_WITH_LOW_CHIPS_ARG  ) ) {
 			getOldSubmittedIdeas( 1, [] );
 		} else if ( _.contains( process.argv, CREATE_REVIEW_LIST_ARG  ) ) {
-			getNewSubmittedIdeas( 1, [] );
+			createReviewList();
 		} else {
 			console.log( 'Error: no script given. Options are ' + ARCHIVE_OLD_WITH_LOW_CHIPS_ARG + ' or ' + CREATE_REVIEW_LIST_ARG );
 		}
@@ -289,16 +288,43 @@ function archiveIdea( index, idea_ids ){
 	req.end();
 };
 
-function getNewSubmittedIdeas( page_index, ideas ){
-	console.log("Let's get the list of 'Submitted' ideas from this year (page "+ page_index + ")...");
+function createReviewList() {
+	var checks = [];
+	checks = [
+		{
+			'statusLog': 'Submitted ideas from this year',
+			'statusId': SUBMITTED_STATUS_ID,
+			'order': 'date_created DESC',
+			'dateCheck': THIS_YEAR
+		},
+		{
+			'statusLog': 'Submitted ideas from over a year',
+			'statusId': SUBMITTED_STATUS_ID,
+			'order': 'chips DESC',
+			'dateCheck': YEAR_OLD
+		},
+		{
+			'statusLog': 'Not Planned ideas from over a year',
+			'statusId': NOT_PLANNED_STATUS_ID,
+			'order': 'chips DESC',
+			'dateCheck': YEAR_OLD
+		}
+	];
+
+	processCheck( checks, 0, 1, [] );
+};
+
+function processCheck( checks, check_index, page_index, ideas ){
+	var check = checks[ check_index ];
+	console.log("Let's get the list of " + check.statusLog + " (page "+ page_index + ")...");
 	
 	var date_cutoff = new Date();
 	date_cutoff.setFullYear( date_cutoff.getFullYear() - 1);
 	
 	var options = {
 		hostname: BRIGHTIDEA_HOST,
-		path: '/api3/idea?visible=1&status_id=' + SUBMITTED_STATUS_ID +
-			'&order=' + encodeURIComponent('date_created DESC') +
+		path: '/api3/idea?visible=1&status_id=' + check.statusId +
+			'&order=' + encodeURIComponent( check.order ) +
 			'&page_size=50&page=' + page_index,
 		method: 'GET',
 		headers: {
@@ -320,13 +346,24 @@ function getNewSubmittedIdeas( page_index, ideas ){
 			var fetch_other_page = false;
 			
 			_.each(data.idea_list, function( idea ){
-				if ( new Date( idea.date_created ) >= date_cutoff ) {
+				
+				var date_check;
+				if ( check.dateCheck == THIS_YEAR ) {
+					date_check = new Date( idea.date_created ) >= date_cutoff;
+				} else if ( check.dateCheck == YEAR_OLD ) {
+					date_check = new Date( idea.date_created ) < date_cutoff;
+				} else {
+					date_check = true;
+				}
+			
+				if ( date_check ) {
 					fetch_other_page = true;
 					if( IGNORE_LIST.indexOf( idea.idea_code ) == -1 ) {
 						IGNORE_LIST.push( idea.idea_code );
 						ideas.push( idea );
 						console.log( "Found " + idea.idea_code +
 							" submitted on " + idea.date_created +
+							" modified on " + idea.date_modified +
 							" with " + idea.chips + " chips.");
 					}
 				} else {
@@ -335,146 +372,16 @@ function getNewSubmittedIdeas( page_index, ideas ){
 			},this);
 			
 			if( fetch_other_page ) {
-				getNewSubmittedIdeas( page_index + 1, ideas );
+				processCheck( checks, check_index, page_index + 1, ideas );
 			} else {
 				console.log( 'Found ' + ideas.length + ' ideas.' );
 				if ( ideas.length >= ( MAX_IDEAS * REVIEWERS.length ) ) {
 					divvyIdeas( ideas, {} );
-				} else {
-					getTopVotedSubmittedIdeas( 1, ideas );
-				}
-			}
-		});
-	} );
-
-	req.on( 'error' , function (e) {
-		console.log( 'problem with request: ' + e.message );
-	} );
-
-	req.end();
-};
-
-function getTopVotedSubmittedIdeas( page_index, ideas ){
-	console.log("Let's get the top voted 'Submitted' ideas (page "+ page_index + ")...");
-	var page_size = 50;
-	
-	var options = {
-		hostname: BRIGHTIDEA_HOST,
-		path: '/api3/idea?visible=1&status_id=' + SUBMITTED_STATUS_ID +
-			'&order=' + encodeURIComponent('chips DESC') +
-			'&page_size=' + page_size + '&page=' + page_index,
-		method: 'GET',
-		headers: {
-			'Authorization': 'Bearer ' + BRIGHTIDEA_ACCESS_TOKEN
-		}
-	};
-		
-	var req = https.request( options , resDetails => {
-		resDetails.setEncoding( 'utf8' );
-		var data = '';
-		
-		resDetails.on('data', (d) => {
-			data = data + d;
-		});
-		
-		resDetails.on('end', () => {
-			data = JSON.parse(data);
-			
-			var fetch_other_page = false;
-			
-			_.each(data.idea_list, function( idea ){
-				if( idea.chips > CHIPS_CUTOFF ) {
-					fetch_other_page = true;
-					if( IGNORE_LIST.indexOf( idea.idea_code ) == -1 ) {
-						IGNORE_LIST.push( idea.idea_code );
-						ideas.push( idea );
-						console.log( "Found " + idea.idea_code +
-							" submitted on " + idea.date_created +
-							" with " + idea.chips + " chips.");
-					}
-				} else {
-					fetch_other_page = false;
-				}
-			},this);
-			
-			if( ( ideas.length < ( MAX_IDEAS * REVIEWERS.length ) ) && ( fetch_other_page ) ) {
-				getTopVotedSubmittedIdeas( page_index + 1, ideas );
-			} else {
-				console.log( 'Found ' + ideas.length + ' ideas.' );
-				if ( ideas.length >= ( MAX_IDEAS * REVIEWERS.length ) ) {
+				} else if ( check_index >= checks.length - 1 ) {
+					console.log( 'WARNING - WE NEED MORE IDEAS!' );
 					divvyIdeas( ideas, {} );
 				} else {
-					getTopVotedOldNotPlannedIdeas( 1, ideas );
-				}
-			}
-		});
-	} );
-
-	req.on( 'error' , function (e) {
-		console.log( 'problem with request: ' + e.message );
-	} );
-
-	req.end();
-};
-
-function getTopVotedOldNotPlannedIdeas( page_index, ideas ){
-	console.log("Let's get the top voted 'Not Planned' ideas that haven't been updated in a year (page "+ page_index + ")...");
-	var page_size = 50;
-	
-	var date_cutoff = new Date();
-	date_cutoff.setFullYear( date_cutoff.getFullYear() - 1);
-	
-	var options = {
-		hostname: BRIGHTIDEA_HOST,
-		path: '/api3/idea?visible=1&status_id=' + NOT_PLANNED_STATUS_ID +
-			'&order=' + encodeURIComponent('chips DESC') +
-			'&page_size=' + page_size + '&page=' + page_index,
-		method: 'GET',
-		headers: {
-			'Authorization': 'Bearer ' + BRIGHTIDEA_ACCESS_TOKEN
-		}
-	};
-		
-	var req = https.request( options , resDetails => {
-		resDetails.setEncoding( 'utf8' );
-		var data = '';
-		
-		resDetails.on('data', (d) => {
-			data = data + d;
-		});
-		
-		resDetails.on('end', () => {
-			data = JSON.parse(data);
-			
-			var fetch_other_page = false;
-			
-			_.each(data.idea_list, function( idea ){
-				if( idea.chips > CHIPS_CUTOFF ) {
-					fetch_other_page = true;
-					if( IGNORE_LIST.indexOf( idea.idea_code ) == -1 ) {
-						IGNORE_LIST.push( idea.idea_code );
-						
-						if ( new Date( idea.date_modified ) <= date_cutoff ) {
-							ideas.push( idea );
-							console.log( "Found " + idea.idea_code +
-								" modified on " + idea.date_modified +
-								" with " + idea.chips + " chips.");
-						}
-					}
-				} else {
-					fetch_other_page = false;
-				}
-			},this);
-			
-			if( ( ideas.length < ( MAX_IDEAS * REVIEWERS.length ) ) && ( fetch_other_page ) ) {
-				getTopVotedOldNotPlannedIdeas( page_index + 1, ideas );
-			} else {
-				console.log( 'Found ' + ideas.length + ' ideas.' );
-				if ( ideas.length >= ( MAX_IDEAS * REVIEWERS.length ) ) {
-					divvyIdeas( ideas, {} );
-				} else {
-					console.log( 'Warning: We need more ideas!' );
-					divvyIdeas( ideas, {} );
+					processCheck( checks, check_index + 1, 1, ideas );
 				}
 			}
 		});
@@ -531,7 +438,7 @@ function outputReviewList( ideas_by_reviewer ) {
 				idea.date_created,
 				idea.member.screen_name,
 				idea.title,
-				idea.description.replace(/\n/g, ''),
+				idea.description.replace(/\n/g, ''), //Avoid having description line breaks messing up the TSV
 				idea.status.name,
 				idea.chips,
 				idea.comment_count,
