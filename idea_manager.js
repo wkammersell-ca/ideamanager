@@ -16,6 +16,12 @@ var ARCHIVE_OLD_WITH_LOW_CHIPS_ARG = '--archive_ideas';
 var CREATE_REVIEW_LIST_ARG = '--create_review_list';
 
 var SUBMITTED_STATUS_ID = '7CA6F64B-54A6-4FD4-BAD1-00D331A30961';
+var UNDER_REVIEW_STATUS_ID = '3CE7A5D7-45F3-4852-A83F-0E9CECDEA3FF';
+var NEED_INPUT_STATUS_ID = '141A6B8E-78B6-48B0-98EE-DF80F4DEEF65';
+var UNDER_REVIEW_STATUS_ID = '3CE7A5D7-45F3-4852-A83F-0E9CECDEA3FF';
+var PLANNED_STATUS_ID = '44396918-8AB2-4B08-889C-F70B90CE16F4';
+var COMING_SOON_STATUS_ID = 'B26D8DCB-DF7F-46F1-BA3D-E3F34CE019A4';
+var RELEASED_STATUS_ID = '53EDDE29-DE5A-4847-BBB0-4D0C3033301D';
 var NOT_PLANNED_STATUS_ID = 'A5C1C89E-46CB-4234-B348-A6B44E80E0BD';
 var ARCHIVED_STATUS_ID = '9AE7A1DB-F3DE-4997-BA82-0BE7987A9ECB';
 
@@ -138,7 +144,6 @@ function getBrightIdeaTokenFromRefresh( refresh_token ) {
 function writeRefreshTokenToFile( refresh_token ) {
 	fs.writeFile(TOKEN_FILE_PATH, 'refresh:' + refresh_token, 'utf8', (err) => {
 		if (err) throw err;
-		// console.log( 'Access Token = ' + BRIGHTIDEA_ACCESS_TOKEN );
 		if ( _.contains( process.argv, ARCHIVE_OLD_WITH_LOW_CHIPS_ARG  ) ) {
 			getOldSubmittedIdeas( 1, [] );
 		} else if ( _.contains( process.argv, CREATE_REVIEW_LIST_ARG  ) ) {
@@ -160,6 +165,7 @@ function getOldSubmittedIdeas( page_index, idea_ids ){
 		path: '/api3/idea?visible=1&status_id=' + SUBMITTED_STATUS_ID +
 			'&order=' + encodeURIComponent('date_created ASC') +
 			'&page_size=50&page=' + page_index,
+//		path: '/api3/idea?idea_code=D2880&page=1',
 		method: 'GET',
 		headers: {
 			'Authorization': 'Bearer ' + BRIGHTIDEA_ACCESS_TOKEN
@@ -176,6 +182,7 @@ function getOldSubmittedIdeas( page_index, idea_ids ){
 		
 		resDetails.on('end', () => {
 			data = JSON.parse(data);
+		//	console.log(data.idea_list[0].status);
 			var fetch_other_page = false;
 			
 			_.each(data.idea_list, function( idea ){
@@ -304,6 +311,24 @@ function createReviewList() {
 			'dateCheck': YEAR_OLD
 		},
 		{
+			'statusLog': 'Under Review ideas from over a year',
+			'statusId': UNDER_REVIEW_STATUS_ID,
+			'order': 'chips DESC',
+			'dateCheck': YEAR_OLD
+		},
+		{
+			'statusLog': 'Need Input ideas from over a year',
+			'statusId': NEED_INPUT_STATUS_ID,
+			'order': 'chips DESC',
+			'dateCheck': YEAR_OLD
+		},
+		{
+			'statusLog': 'Planned ideas from over a year',
+			'statusId': PLANNED_STATUS_ID,
+			'order': 'chips DESC',
+			'dateCheck': YEAR_OLD
+		},
+		{
 			'statusLog': 'Not Planned ideas from over a year',
 			'statusId': NOT_PLANNED_STATUS_ID,
 			'order': 'chips DESC',
@@ -371,17 +396,19 @@ function processCheck( checks, check_index, page_index, ideas ){
 				}
 			},this);
 			
-			if( fetch_other_page ) {
-				processCheck( checks, check_index, page_index + 1, ideas );
+			if ( ideas.length >= ( MAX_IDEAS * REVIEWERS.length ) ) {
+				divvyIdeas( ideas, {} );
 			} else {
-				console.log( 'Found ' + ideas.length + ' ideas.' );
-				if ( ideas.length >= ( MAX_IDEAS * REVIEWERS.length ) ) {
-					divvyIdeas( ideas, {} );
-				} else if ( check_index >= checks.length - 1 ) {
-					console.log( 'WARNING - WE NEED MORE IDEAS!' );
-					divvyIdeas( ideas, {} );
+				if( fetch_other_page ) {
+					processCheck( checks, check_index, page_index + 1, ideas );
 				} else {
-					processCheck( checks, check_index + 1, 1, ideas );
+					console.log( 'Found ' + ideas.length + ' ideas.' );
+					if ( check_index >= checks.length - 1 ) {
+						console.log( 'WARNING - WE NEED MORE IDEAS!' );
+						divvyIdeas( ideas, {} );
+					} else {
+						processCheck( checks, check_index + 1, 1, ideas );
+					}
 				}
 			}
 		});
