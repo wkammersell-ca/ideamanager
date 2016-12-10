@@ -193,21 +193,35 @@ function viewIdea( idea_id ) {
 };
 
 function archiveIdeas() {
-	getOldSubmittedIdeas( 1, [] );
+	var archivals = [];
+	archivals = [
+		{
+			'statusLog': 'Submitted ideas',
+			'statusId': SUBMITTED_STATUS_ID,
+			'order': 'date_created ASC'
+		},
+		{
+			'statusLog': 'Not Planned ideas',
+			'statusId': NOT_PLANNED_STATUS_ID,
+			'order': 'date_created ASC'
+		}
+	];
+	
+	processArchivals( archivals, 0, 1, [] );
 };
 
-function getOldSubmittedIdeas( page_index, idea_ids ){
-	console.log("Let's get the list of 'Submitted' ideas (page "+ page_index + ")...");
+function processArchivals( archivals, archival_index, page_index, idea_ids ){
+	var archival = archivals[ archival_index ];
+	console.log("Let's get the list of " + archival.statusLog + " (page "+ page_index + ")...");
 	
 	var date_cutoff = new Date();
 	date_cutoff.setFullYear( date_cutoff.getFullYear() - 1);
 	
 	var options = {
 		hostname: BRIGHTIDEA_HOST,
-		path: '/api3/idea?visible=1&status_id=' + SUBMITTED_STATUS_ID +
-			'&order=' + encodeURIComponent('date_created ASC') +
+		path: '/api3/idea?visible=1&status_id=' + archival.statusId +
+			'&order=' + encodeURIComponent( archival.order ) +
 			'&page_size=50&page=' + page_index,
-//		path: '/api3/idea?idea_code=D2880&page=1',
 		method: 'GET',
 		headers: {
 			'Authorization': 'Bearer ' + BRIGHTIDEA_ACCESS_TOKEN
@@ -224,7 +238,6 @@ function getOldSubmittedIdeas( page_index, idea_ids ){
 		
 		resDetails.on('end', () => {
 			data = JSON.parse(data);
-		//	console.log(data.idea_list[0].status);
 			var fetch_other_page = false;
 			
 			_.each(data.idea_list, function( idea ){
@@ -242,13 +255,18 @@ function getOldSubmittedIdeas( page_index, idea_ids ){
 			},this);
 			
 			if( fetch_other_page ) {
-				getOldSubmittedIdeas( page_index + 1, idea_ids );
+				processArchivals( archivals, archival_index, page_index + 1, idea_ids );
 			} else {
 				console.log( 'Found ' + idea_ids.length + ' ideas.' );
-				if ( _.contains( process.argv, SAFE_MODE_ARG  ) ) {
-					console.log( 'Done [SAFE MODE]' );
+				
+				if ( archival_index >= archivals.length - 1 ) {
+					if ( _.contains( process.argv, SAFE_MODE_ARG  ) ) {
+						console.log( 'Done [SAFE MODE]' );
+					} else {
+						commentIdea( 0, idea_ids );
+					}
 				} else {
-					commentIdea( 0, idea_ids );
+					processArchivals( archivals, archival_index + 1, 1, idea_ids );
 				}
 			}
 		});
