@@ -12,8 +12,10 @@ var BRIGHTIDEA_HOST = 'rallydev.brightidea.com';
 var BRIGHTIDEA_RENAMED_HOST = 'ideas.rallydev.com';
 
 var SAFE_MODE_ARG = '--safe';
-var ARCHIVE_OLD_WITH_LOW_CHIPS_ARG = '--archive_ideas';
+var ARCHIVE_IDEAS_ARG = '--archive_ideas';
 var CREATE_REVIEW_LIST_ARG = '--create_review_list';
+var VIEW_IDEA_ARG = '--view_idea';
+var IDEA_ID_ARG = '--idea_id=';
 
 var SUBMITTED_STATUS_ID = '7CA6F64B-54A6-4FD4-BAD1-00D331A30961';
 var UNDER_REVIEW_STATUS_ID = '3CE7A5D7-45F3-4852-A83F-0E9CECDEA3FF';
@@ -144,14 +146,54 @@ function getBrightIdeaTokenFromRefresh( refresh_token ) {
 function writeRefreshTokenToFile( refresh_token ) {
 	fs.writeFile(TOKEN_FILE_PATH, 'refresh:' + refresh_token, 'utf8', (err) => {
 		if (err) throw err;
-		if ( _.contains( process.argv, ARCHIVE_OLD_WITH_LOW_CHIPS_ARG  ) ) {
-			getOldSubmittedIdeas( 1, [] );
+		if ( _.contains( process.argv, ARCHIVE_IDEAS_ARG  ) ) {
+			archiveIdeas();
 		} else if ( _.contains( process.argv, CREATE_REVIEW_LIST_ARG  ) ) {
 			createReviewList();
+		} else if ( _.contains( process.argv, VIEW_IDEA_ARG ) ) {
+			// TODO: Be smarter here rather than assume the idea_id is always the second argument
+			viewIdea( process.argv[3].split('=')[1] );
 		} else {
-			console.log( 'Error: no script given. Options are ' + ARCHIVE_OLD_WITH_LOW_CHIPS_ARG + ' or ' + CREATE_REVIEW_LIST_ARG );
+			console.log( 'Error: no script given. Options are ' + ARCHIVE_IDEAS_ARG + ' or ' + CREATE_REVIEW_LIST_ARG + ' or ' + VIEW_IDEA_ARG );
 		}
 	});
+};
+
+function viewIdea( idea_id ) {
+	console.log("Let's get the details for idea " + idea_id );
+	
+	var options = {
+		hostname: BRIGHTIDEA_HOST,
+		path: '/api3/idea?idea_code=' + idea_id,
+		method: 'GET',
+		headers: {
+			'Authorization': 'Bearer ' + BRIGHTIDEA_ACCESS_TOKEN
+		}
+	};
+	
+	var req = https.request( options , resDetails => {
+		resDetails.setEncoding( 'utf8' );
+		var data = '';
+		
+		resDetails.on('data', (d) => {
+			data = data + d;
+		});
+		
+		resDetails.on('end', () => {
+			data = JSON.parse(data);
+			console.log( data.idea_list[0] );
+		});
+	} );
+
+	req.on( 'error' , function (e) {
+		console.log( 'problem with request: ' + e.message );
+	} );
+
+	req.end();
+};
+
+function archiveIdeas() {
+	getOldSubmittedIdeas( 1, [] );
 };
 
 function getOldSubmittedIdeas( page_index, idea_ids ){
