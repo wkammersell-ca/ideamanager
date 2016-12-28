@@ -433,17 +433,18 @@ function processCheck( checks, check_index, page_index, ideas ){
 			_.each(data.idea_list, function( idea ){
 				
 				var date_check;
+				var idea_date = new Date( idea.date_modified );
 				if ( check.dateCheck == THIS_YEAR ) {
-					date_check = new Date( idea.date_created ) >= date_cutoff;
+					date_check = idea_date >= date_cutoff;
 				} else if ( check.dateCheck == YEAR_OLD ) {
-					date_check = new Date( idea.date_created ) < date_cutoff;
+					date_check = idea_date < date_cutoff;
 				} else {
 					date_check = true;
 				}
 			
 				if ( date_check ) {
-					fetch_other_page = true;
 					if( IGNORE_LIST.indexOf( idea.idea_code ) == -1 ) {
+						fetch_other_page = true;
 						IGNORE_LIST.push( idea.idea_code );
 						ideas.push( idea );
 						console.log( "Found " + idea.idea_code +
@@ -464,7 +465,9 @@ function processCheck( checks, check_index, page_index, ideas ){
 				} else {
 					console.log( 'Found ' + ideas.length + ' ideas.' );
 					if ( check_index >= checks.length - 1 ) {
-						console.log( 'WARNING - WE NEED MORE IDEAS!' );
+						if ( ideas.length < ( REVIEWERS * MAX_IDEAS ) ) {
+							console.log( 'WARNING - WE NEED MORE IDEAS!' );
+						}
 						divvyIdeas( ideas, {} );
 					} else {
 						processCheck( checks, check_index + 1, 1, ideas );
@@ -506,6 +509,7 @@ function outputReviewList( ideas_by_reviewer ) {
 		'Idea Code',
 		'Category',
 		'Date Created',
+		'Date Modified',
 		'Submitter',
 		'Title',
 		'Description',
@@ -523,6 +527,7 @@ function outputReviewList( ideas_by_reviewer ) {
 				idea.idea_code,
 				idea.category.name,
 				idea.date_created,
+				idea.date_modified,
 				idea.member.screen_name,
 				idea.title,
 				idea.description.replace(/\n/g, ''), //Avoid having description line breaks messing up the TSV
