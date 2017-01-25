@@ -434,6 +434,7 @@ function processCheck( checks, check_index, page_index, ideas ){
 				
 				var date_check;
 				var idea_date = new Date( idea.date_modified );
+				
 				if ( check.dateCheck == THIS_YEAR ) {
 					date_check = idea_date >= date_cutoff;
 				} else if ( check.dateCheck == YEAR_OLD ) {
@@ -530,7 +531,7 @@ function outputReviewList( ideas_by_reviewer ) {
 				idea.date_modified,
 				idea.member.screen_name,
 				idea.title,
-				idea.description.replace(/\n/g, ''), //Avoid having description line breaks messing up the TSV
+				idea.description.replace(/[\n\t]/g, ''), //Avoid having description line breaks and tabs messing up the TSV
 				idea.status.name,
 				idea.chips,
 				idea.comment_count,
