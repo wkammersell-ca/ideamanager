@@ -17,6 +17,8 @@ var CREATE_REVIEW_LIST_ARG = '--create_review_list';
 var VIEW_IDEA_ARG = '--view_idea';
 var IDEA_ID_ARG = '--idea_id=';
 
+var CATEGORY_IGNORE_LIST = [ 'Test Management' ];
+
 var SUBMITTED_STATUS_ID = '7CA6F64B-54A6-4FD4-BAD1-00D331A30961';
 var UNDER_REVIEW_STATUS_ID = '3CE7A5D7-45F3-4852-A83F-0E9CECDEA3FF';
 var NEED_INPUT_STATUS_ID = '141A6B8E-78B6-48B0-98EE-DF80F4DEEF65';
@@ -444,7 +446,8 @@ function processCheck( checks, check_index, page_index, ideas ){
 				}
 			
 				if ( date_check ) {
-					if( IGNORE_LIST.indexOf( idea.idea_code ) == -1 ) {
+					if( ( IGNORE_LIST.indexOf( idea.idea_code ) == -1 ) &&
+						( CATEGORY_IGNORE_LIST.indexOf( idea.category.name ) == -1 ) ) {
 						fetch_other_page = true;
 						IGNORE_LIST.push( idea.idea_code );
 						ideas.push( idea );
