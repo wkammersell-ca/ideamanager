@@ -37,7 +37,7 @@ var CHIPS_CUTOFF = 7;
 var COMMENT_TEXT = "I'm archiving this as it has " + CHIPS_CUTOFF + " or less chips in a year. Please resubmit if you still want this.";
 
 // vars for creating review lists
-var MAX_IDEAS = 15;
+var MAX_IDEAS = 10;
 var REVIEWERS = [ 'Andrea', 'Marianne', 'Mia', 'Steph', 'William' ];
 var REVIEW_LIST_FILTE_PATH = 'review_list.tsv';
 
@@ -433,31 +433,28 @@ function processCheck( checks, check_index, page_index, ideas ){
 			var fetch_other_page = false;
 			
 			_.each(data.idea_list, function( idea ){
+				if( IGNORE_LIST.indexOf( idea.idea_code ) == -1 ) {
+					fetch_other_page = true;
+					IGNORE_LIST.push( idea.idea_code );
+					
+					var date_check;
+					var idea_date = new Date( idea.date_modified );
 				
-				var date_check;
-				var idea_date = new Date( idea.date_modified );
-				
-				if ( check.dateCheck == THIS_YEAR ) {
-					date_check = idea_date >= date_cutoff;
-				} else if ( check.dateCheck == YEAR_OLD ) {
-					date_check = idea_date < date_cutoff;
-				} else {
-					date_check = true;
-				}
+					if ( check.dateCheck == THIS_YEAR ) {
+						date_check = idea_date >= date_cutoff;
+					} else if ( check.dateCheck == YEAR_OLD ) {
+						date_check = idea_date < date_cutoff;
+					} else {
+						date_check = true;
+					}
 			
-				if ( date_check ) {
-					if( ( IGNORE_LIST.indexOf( idea.idea_code ) == -1 ) &&
-						( CATEGORY_IGNORE_LIST.indexOf( idea.category.name ) == -1 ) ) {
-						fetch_other_page = true;
-						IGNORE_LIST.push( idea.idea_code );
+					if ( date_check && ( CATEGORY_IGNORE_LIST.indexOf( idea.category.name ) == -1 ) ) {
 						ideas.push( idea );
 						console.log( "Found " + idea.idea_code +
 							" submitted on " + idea.date_created +
 							" modified on " + idea.date_modified +
 							" with " + idea.chips + " chips.");
 					}
-				} else {
-					fetch_other_page = false;
 				}
 			},this);
 			
