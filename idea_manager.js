@@ -38,7 +38,7 @@ var COMMENT_TEXT = "I'm archiving this as it has " + CHIPS_CUTOFF + " or less ch
 
 // vars for creating review lists
 var MAX_IDEAS = 10;
-var REVIEWERS = [ 'Andrea', 'Marianne', 'Mia', 'William' ];
+var REVIEWERS = [ 'Andrea', 'Erin', 'Marianne', 'Mia', 'William' ];
 var REVIEW_LIST_FILTE_PATH = 'review_list.tsv';
 
 console.log("Let's get started!");
@@ -429,7 +429,6 @@ function processCheck( checks, check_index, page_index, ideas ){
 		
 		resDetails.on('end', () => {
 			data = JSON.parse(data);
-			
 			var fetch_other_page = false;
 			
 			_.each(data.idea_list, function( idea ){
@@ -458,21 +457,14 @@ function processCheck( checks, check_index, page_index, ideas ){
 				}
 			},this);
 			
-			if ( ideas.length >= ( MAX_IDEAS * REVIEWERS.length ) ) {
-				divvyIdeas( ideas, {} );
+			if( fetch_other_page ) {
+				processCheck( checks, check_index, page_index + 1, ideas );
 			} else {
-				if( fetch_other_page ) {
-					processCheck( checks, check_index, page_index + 1, ideas );
+				console.log( 'Found ' + ideas.length + ' ideas.' );
+				if ( check_index >= checks.length - 1 ) {
+					checkComments( ideas, 0 );
 				} else {
-					console.log( 'Found ' + ideas.length + ' ideas.' );
-					if ( check_index >= checks.length - 1 ) {
-						if ( ideas.length < ( REVIEWERS * MAX_IDEAS ) ) {
-							console.log( 'WARNING - WE NEED MORE IDEAS!' );
-						}
-						divvyIdeas( ideas, {} );
-					} else {
-						processCheck( checks, check_index + 1, 1, ideas );
-					}
+					processCheck( checks, check_index + 1, 1, ideas );
 				}
 			}
 		});
@@ -483,6 +475,71 @@ function processCheck( checks, check_index, page_index, ideas ){
 	} );
 
 	req.end();
+};
+
+function checkComments( ideas, idea_index ) {
+	if( ( idea_index >= ideas.length ) || ( ideas.length >= ( REVIEWERS * MAX_IDEAS ) ) ){
+		divvyIdeas( ideas, {} );
+	} else {
+	
+		var idea = ideas[idea_index];
+		console.log("Checking comments for " + idea.idea_code + "...");
+		
+		var date_cutoff = new Date();
+		date_cutoff.setFullYear( date_cutoff.getFullYear() - 1);
+	
+		var options = {
+			hostname: BRIGHTIDEA_HOST,
+			path: '/api3/comment?idea_id=' + idea.id +
+				'&order=' + encodeURIComponent( 'date_created' ) +
+				'&page_size=10&page=1',
+			method: 'GET',
+			headers: {
+				'Authorization': 'Bearer ' + BRIGHTIDEA_ACCESS_TOKEN
+			}
+		};
+	
+		var req = https.request( options , resDetails => {
+			resDetails.setEncoding( 'utf8' );
+			var data = '';
+		
+			resDetails.on('data', (d) => {
+				data = data + d;
+			});
+		
+			resDetails.on('end', () => {
+				data = JSON.parse(data);
+				var admin_comment_found = false;
+			
+				_.each(data.comment_list, function( comment ){
+					var comment_date = new Date( comment.date_created );
+					
+					console.log( comment.admin );
+					console.log( comment.member);
+			
+					if ( !admin_comment_found &&
+						 ( comment_date < date_cutoff ) &&
+						 ( comment.admin == 1 ) ) {
+						console.log( "Found recent admin comment.");
+						ideas.splice( idea_index, 1 );
+						admin_comment_found = true;
+					}
+				},this);
+			
+				if( admin_comment_found ) {
+					checkComments( ideas, idea_index );
+				} else {
+					checkComments( ideas, idea_index + 1 );
+				}
+			});
+		} );
+
+		req.on( 'error' , function (e) {
+			console.log( 'problem with request: ' + e.message );
+		} );
+
+		req.end();
+	}
 };
 
 function divvyIdeas( ideas, ideas_by_reviewer ){
