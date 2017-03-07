@@ -1,0 +1,9 @@
+extends layout
+
+block content
+	div.searchBar
+		form(name="search", method="post")
+			input(type="text",name="searchString")
+			input(type="submit",value="Search")
+	h1=title
+

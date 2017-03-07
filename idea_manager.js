@@ -6,7 +6,7 @@ var _ = require('underscore');
 
 var BRIGHTIDEA_ACCESS_TOKEN;
 var IGNORE_LIST = [];
-var TOKEN_FILE_PATH = 'token.txt';
+var TOKEN_FILE_PATH = 'token.json';
 var IGNORE_FILE_PATH = 'ignore.txt';
 var BRIGHTIDEA_HOST = 'rallydev.brightidea.com';
 var BRIGHTIDEA_RENAMED_HOST = 'ideas.rallydev.com';
@@ -42,7 +42,7 @@ var REVIEWERS = [ 'Andrea', 'Erin', 'Marianne', 'Mia', 'William' ];
 var REVIEW_LIST_FILTE_PATH = 'review_list.tsv';
 
 console.log("Let's get started!");
-console.log("First, let's read token.txt for login info");
+console.log("First, let's read " + TOKEN_FILE_PATH + " for login info");
 
 // Initialize Ignore List
 fs.readFile( IGNORE_FILE_PATH, 'utf8', (err, data) => {
@@ -57,11 +57,10 @@ fs.readFile( IGNORE_FILE_PATH, 'utf8', (err, data) => {
 function readTokenFile(){
 	fs.readFile( TOKEN_FILE_PATH, 'utf8', (err, data) => {
 		if (err) { throw err; }
+		data = JSON.parse(data);
+		var code = data.code;
 	
-		// Assumes token file is the format type.code
-		var code = data.split(':')[1];
-	
-		if( data.startsWith('authorization') ) {
+		if( data.type == 'authorization' ) {
 			console.log("Let's convert an authorization code to a token");	
 			getBrightIdeaTokenFromAutentication( code );
 		} else {
@@ -71,7 +70,7 @@ function readTokenFile(){
 };
 
 function getBrightIdeaTokenFromAutentication( code ){
-	console.log("Converting code (" + code + ") to a token");
+	console.log("Converting authorization code to a token");
 	var options = {
 		hostname: 'auth.brightidea.com' ,
 		path: '/_oauth2/token',
@@ -94,8 +93,13 @@ function getBrightIdeaTokenFromAutentication( code ){
 		resDetails.setEncoding( 'utf8' );
 		resDetails.on('data', (d) => {
 			var data = JSON.parse(d);
-			BRIGHTIDEA_ACCESS_TOKEN = data.access_token;
-			writeRefreshTokenToFile( data.refresh_token );
+			
+			if( data.error ) {
+				console.log( 'ERROR - ' + data.error_description );
+			} else {
+				BRIGHTIDEA_ACCESS_TOKEN = data.access_token;
+				writeRefreshTokenToFile( data.refresh_token );
+			}
 		});
 	} );
 
@@ -132,8 +136,13 @@ function getBrightIdeaTokenFromRefresh( refresh_token ) {
 		resDetails.setEncoding( 'utf8' );
 		resDetails.on('data', (d) => {
 			var data = JSON.parse(d);
-			BRIGHTIDEA_ACCESS_TOKEN = data.access_token;
-			writeRefreshTokenToFile( data.refresh_token );
+			
+			if( data.error ) {
+				console.log( 'ERROR - ' + data.error_description );
+			} else {
+				BRIGHTIDEA_ACCESS_TOKEN = data.access_token;
+				writeRefreshTokenToFile( data.refresh_token );
+			}
 		});
 	});
 
@@ -146,7 +155,11 @@ function getBrightIdeaTokenFromRefresh( refresh_token ) {
 };
 
 function writeRefreshTokenToFile( refresh_token ) {
-	fs.writeFile(TOKEN_FILE_PATH, 'refresh:' + refresh_token, 'utf8', (err) => {
+	var output = {};
+	output.type = 'refresh';
+	output.code = refresh_token;
+
+	fs.writeFile(TOKEN_FILE_PATH, JSON.stringify( output ), 'utf8', (err) => {
 		if (err) throw err;
 		if ( _.contains( process.argv, ARCHIVE_IDEAS_ARG  ) ) {
 			archiveIdeas();
@@ -183,7 +196,7 @@ function viewIdea( idea_id ) {
 		
 		resDetails.on('end', () => {
 			data = JSON.parse(data);
-			console.log( data.idea_list[0] );
+			console.log( data );
 		});
 	} );
 
