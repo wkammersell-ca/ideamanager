@@ -7,19 +7,9 @@ var querystring = require('querystring');
 var fs = require('fs');
 var _ = require('underscore');
 
-var IGNORE_LIST = [];
 var TOKEN_FILE_PATH = 'token.json';
-var IGNORE_FILE_PATH = 'ignore.txt';
 var BRIGHTIDEA_HOST = 'rallydev.brightidea.com';
 var BRIGHTIDEA_RENAMED_HOST = 'ideas.rallydev.com';
-
-var SAFE_MODE_ARG = '--safe';
-var ARCHIVE_IDEAS_ARG = '--archive_ideas';
-var CREATE_REVIEW_LIST_ARG = '--create_review_list';
-var VIEW_IDEA_ARG = '--view_idea';
-var IDEA_ID_ARG = '--idea_id=';
-
-var CATEGORY_IGNORE_LIST = [ 'Test Management' ];
 
 var SUBMITTED_STATUS_ID = '7CA6F64B-54A6-4FD4-BAD1-00D331A30961';
 var UNDER_REVIEW_STATUS_ID = '3CE7A5D7-45F3-4852-A83F-0E9CECDEA3FF';
@@ -30,20 +20,6 @@ var COMING_SOON_STATUS_ID = 'B26D8DCB-DF7F-46F1-BA3D-E3F34CE019A4';
 var RELEASED_STATUS_ID = '53EDDE29-DE5A-4847-BBB0-4D0C3033301D';
 var NOT_PLANNED_STATUS_ID = 'A5C1C89E-46CB-4234-B348-A6B44E80E0BD';
 var ARCHIVED_STATUS_ID = '9AE7A1DB-F3DE-4997-BA82-0BE7987A9ECB';
-
-var THIS_YEAR = 'this_year';
-var YEAR_OLD = 'year_old';
-
-/*
-// Initialize Ignore List
-fs.readFile( IGNORE_FILE_PATH, 'utf8', (err, data) => {
-	if (err) { throw err; }
-	
-	// Assumes ignore list is the format of one ID per line
-	IGNORE_LIST = data.split('\n');
-	
-	readTokenFile();
-}); */
 
 var createBrightIdeaAPIToken = function( req, res, next ) {
 	console.log("Checking token file - " + TOKEN_FILE_PATH + "...");
@@ -133,12 +109,18 @@ function writeTokenToFile( refresh_token, access_token, req, res, next ) {
 	});
 };
 
-function viewIdea( idea_id, req, res, next ) {
-	console.log("Let's get the details for idea " + idea_id );
+function search( searchString, req, res, next ) {
+	if ( req.search_results === undefined ) {
+		console.log( 'Initializing Search variables' );
+		req.search_results = [];
+		req.search_page = 1;
+	}
+	console.log( "Let's search for: " + searchString + " (page " + req.search_page + ")" );
 	
 	var options = {
 		hostname: BRIGHTIDEA_HOST,
-		path: '/api3/idea?idea_code=' + idea_id,
+		path: '/api3/search?query=' + searchString +
+			'&type=idea&format=json&page=' + req.search_page,
 		method: 'GET',
 		headers: {
 			'Authorization': 'Bearer ' + req.access_token
@@ -147,6 +129,7 @@ function viewIdea( idea_id, req, res, next ) {
 	
 	var myReq = https.request( options , resDetails => {
 		resDetails.setEncoding( 'utf8' );
+				
 		var data = '';
 		
 		resDetails.on('data', (d) => {
@@ -155,8 +138,14 @@ function viewIdea( idea_id, req, res, next ) {
 		
 		resDetails.on('end', () => {
 			data = JSON.parse(data);
-			req.idea_data = data.idea_list[0].title;
-			next();
+			req.search_results = req.search_results.concat( data.search );
+			
+			if ( req.search_page < data.stats.page_count ) {
+				req.search_page = req.search_page + 1;
+				search( searchString, req, res, next );
+			} else {
+				next();
+			}
 		});
 	} );
 
@@ -172,9 +161,10 @@ router.get('/', createBrightIdeaAPIToken, function(req, res) {
 });
 
 router.post('/', createBrightIdeaAPIToken, function(req, res, next) {
-	viewIdea( req.body.searchString, req, res, next );
+	search( req.body.searchString, req, res, next );
 }, function( req, res) {
-	res.render('index', { title: req.idea_data });
+	console.log( req.search_results );
+	res.render('results', { searchResults: req.search_results });
 });
 
 module.exports = router;
