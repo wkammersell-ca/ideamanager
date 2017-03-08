@@ -164,7 +164,7 @@ router.post('/', createBrightIdeaAPIToken, function(req, res, next) {
 	search( req.body.searchString, req, res, next );
 }, function( req, res) {
 	console.log( req.search_results );
-	res.render('results', { searchResults: req.search_results });
+	res.render('index', { searchResults: req.search_results });
 });
 
 module.exports = router;

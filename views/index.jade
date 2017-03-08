@@ -5,3 +5,13 @@ block content
 		form(name="search", method="post")
 			input(type="text",name="searchString")
 			input(type="submit",value="Search")
+			input(type="checkbox",name="showArchived")
+			| Show Archived
+	if searchResults != null
+		table
+			each result, i in searchResults
+				- var idea_url = "https://ideas.rallydev.com" + result.url
+				tr
+					td: a(href=idea_url,target='_blank') #{result.idea_code}
+					td=result.status
+					td=result.name
