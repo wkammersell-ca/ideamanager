@@ -19,7 +19,7 @@ a:visited {
 	color: #1D2731;
 }
 
-table, th, td {
+table, td {
 	background-color: #F5F5F5;
 	border: 1px solid #D9B310;
 }
@@ -30,4 +30,9 @@ table {
 
 th, td {
 	padding: 2px;
+}
+
+th {
+	background-color: #D9B310;
+	border: 1px solid #F5F5F5;
 }

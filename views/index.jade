@@ -10,6 +10,10 @@ block content
 	if searchResults != null
 		br
 		table.searchResultsTable
+			tr
+				th="ID"
+				th="Status"
+				th="Name"
 			each result, i in searchResults
 				tr
 					td: a(href=result.full_url,target='_blank') #{result.idea_code}
