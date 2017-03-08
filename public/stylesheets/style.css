@@ -1,8 +1,33 @@
 body {
-  padding: 50px;
-  font: 14px "Lucida Grande", Helvetica, Arial, sans-serif;
+	padding: 20px;
+	font: 14px "Lucida Grande", Helvetica, Arial, sans-serif;
+	background-color: #328CC1;
+	color: #1D2731;
+}
+
+.searchBar {
+	background-color: #D9B310;
+	padding: 10px;
+	border-radius: 5px;
 }
 
 a {
-  color: #00B7FF;
+	color: #083C5D;
+}
+
+a:visited {
+	color: #1D2731;
+}
+
+table, th, td {
+	background-color: #F5F5F5;
+	border: 1px solid #D9B310;
+}
+
+table {
+    border-collapse: collapse;
+}
+
+th, td {
+	padding: 2px;
 }

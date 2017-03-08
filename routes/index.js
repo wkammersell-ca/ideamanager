@@ -11,15 +11,7 @@ var TOKEN_FILE_PATH = 'token.json';
 var BRIGHTIDEA_HOST = 'rallydev.brightidea.com';
 var BRIGHTIDEA_RENAMED_HOST = 'ideas.rallydev.com';
 
-var SUBMITTED_STATUS_ID = '7CA6F64B-54A6-4FD4-BAD1-00D331A30961';
-var UNDER_REVIEW_STATUS_ID = '3CE7A5D7-45F3-4852-A83F-0E9CECDEA3FF';
-var NEED_INPUT_STATUS_ID = '141A6B8E-78B6-48B0-98EE-DF80F4DEEF65';
-var UNDER_REVIEW_STATUS_ID = '3CE7A5D7-45F3-4852-A83F-0E9CECDEA3FF';
-var PLANNED_STATUS_ID = '44396918-8AB2-4B08-889C-F70B90CE16F4';
-var COMING_SOON_STATUS_ID = 'B26D8DCB-DF7F-46F1-BA3D-E3F34CE019A4';
-var RELEASED_STATUS_ID = '53EDDE29-DE5A-4847-BBB0-4D0C3033301D';
-var NOT_PLANNED_STATUS_ID = 'A5C1C89E-46CB-4234-B348-A6B44E80E0BD';
-var ARCHIVED_STATUS_ID = '9AE7A1DB-F3DE-4997-BA82-0BE7987A9ECB';
+var DONE_STATUSES = [ 'Archived', 'Already Available', 'Released' ];
 
 var createBrightIdeaAPIToken = function( req, res, next ) {
 	console.log("Checking token file - " + TOKEN_FILE_PATH + "...");
@@ -109,7 +101,8 @@ function writeTokenToFile( refresh_token, access_token, req, res, next ) {
 	});
 };
 
-function search( searchString, req, res, next ) {
+function search( req, res, next ) {
+	var searchString = req.body.searchString;
 	if ( req.search_results === undefined ) {
 		console.log( 'Initializing Search variables' );
 		req.search_results = [];
@@ -138,11 +131,17 @@ function search( searchString, req, res, next ) {
 		
 		resDetails.on('end', () => {
 			data = JSON.parse(data);
-			req.search_results = req.search_results.concat( data.search );
+			_.each(data.search, function( searchResult ){
+				searchResult.full_url = "https://" + BRIGHTIDEA_RENAMED_HOST + searchResult.url;
+				if( DONE_STATUSES.indexOf( searchResult.status ) == -1 ||
+					req.body.showDone ) {
+					req.search_results.push( searchResult );
+				}
+			},this);
 			
 			if ( req.search_page < data.stats.page_count ) {
 				req.search_page = req.search_page + 1;
-				search( searchString, req, res, next );
+				search( req, res, next );
 			} else {
 				next();
 			}
@@ -161,7 +160,7 @@ router.get('/', createBrightIdeaAPIToken, function(req, res) {
 });
 
 router.post('/', createBrightIdeaAPIToken, function(req, res, next) {
-	search( req.body.searchString, req, res, next );
+	search( req, res, next );
 }, function( req, res) {
 	console.log( req.search_results );
 	res.render('index', { searchResults: req.search_results });
