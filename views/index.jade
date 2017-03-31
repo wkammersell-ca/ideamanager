@@ -3,10 +3,11 @@ extends layout
 block content
 	div.searchBar
 		form(name="search", method="post")
-			input(type="text",name="searchString")
-			input(type="submit",value="Search")
-			input(type="checkbox",name="showDone")
+			input(type="text", value="#{searchTerm != null ? searchTerm : ''}", name="searchString")
+			input(type="submit", value="Search")
+			input(type="checkbox", name="showDone")
 			| Show Done
+	img(src="/images/Loading.gif", id="loadingImg")
 	if searchResults != null
 		br
 		table.searchResultsTable
