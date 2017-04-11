@@ -3,7 +3,7 @@ extends layout
 block content
 	div.searchBar
 		form(name="search", method="post")
-			input(type="text", value="#{searchTerm != null ? searchTerm : ''}", name="searchString")
+			input(type="text", value="#{searchString != null ? searchString : ''}", name="searchString")
 			input(type="submit", value="Search")
 			input(type="checkbox", name="showDone")
 			| Show Done
