@@ -38,7 +38,7 @@ var COMMENT_TEXT = "I'm archiving this as it has " + CHIPS_CUTOFF + " or less ch
 
 // vars for creating review lists
 var MAX_IDEAS = 10;
-var REVIEWERS = [ 'Andrea', 'Marianne', 'Mia', 'William' ];
+var REVIEWERS = [ 'Andrea', 'Dan', 'Marianne', 'Mia', 'Pam', 'William' ];
 var REVIEW_LIST_FILTE_PATH = 'review_list.tsv';
 
 console.log("Let's get started!");

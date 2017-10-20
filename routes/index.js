@@ -63,13 +63,10 @@ function getBrightIdeaTokenFromCode( data, req, res, next ){
 		payload.refresh_token = data.code;
 	}
 	
-	console.log(payload)
-	
 	var myReq = https.request( options , resDetails => {
 		resDetails.setEncoding( 'utf8' );
 		resDetails.on('data', (d) => {
 			var data = JSON.parse(d);
-			console.log(data);
 			
 			if( data.error ) {
 				console.log( 'ERROR - ' + data.error_description );
@@ -135,8 +132,6 @@ function search( req, res, next ) {
 		resDetails.on('end', () => {
 			data = JSON.parse(data);
 			
-			console.log(data);
-			
 			_.each(data.search, function( searchResult ){
 				searchResult.full_url = "https://" + BRIGHTIDEA_RENAMED_HOST + searchResult.url;
 				if( DONE_STATUSES.indexOf( searchResult.status ) == -1 ||
@@ -168,7 +163,6 @@ router.get('/', createBrightIdeaAPIToken, function(req, res) {
 router.post('/', createBrightIdeaAPIToken, function(req, res, next) {
 	search( req, res, next );
 }, function( req, res) {
-	console.log( req.search_results );
 	res.render('index', {
 		searchResults: req.search_results,
 		searchString: req.body.searchString,
