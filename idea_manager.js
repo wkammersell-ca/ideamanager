@@ -14,6 +14,7 @@ var BRIGHTIDEA_RENAMED_HOST = 'ideas.rallydev.com';
 var SAFE_MODE_ARG = '--safe';
 var ARCHIVE_IDEAS_ARG = '--archive_ideas';
 var CREATE_REVIEW_LIST_ARG = '--create_review_list';
+var HIDE_IDEAS_ARG = '--hide_ideas';
 var VIEW_IDEA_ARG = '--view_idea';
 var IDEA_ID_ARG = '--idea_id=';
 
@@ -165,6 +166,8 @@ function writeRefreshTokenToFile( refresh_token ) {
 			archiveIdeas();
 		} else if ( _.contains( process.argv, CREATE_REVIEW_LIST_ARG  ) ) {
 			createReviewList();
+		} else if ( _.contains( process.argv, HIDE_IDEAS_ARG ) ) {
+			hideIdeas();
 		} else if ( _.contains( process.argv, VIEW_IDEA_ARG ) ) {
 			// TODO: Be smarter here rather than assume the idea_id is always the second argument
 			viewIdea( process.argv[3].split('=')[1] );
@@ -628,4 +631,125 @@ function outputReviewList( ideas_by_reviewer ) {
 		if (err) throw err;
 		console.log('Review List written to: ' + REVIEW_LIST_FILTE_PATH );
 	});
+};
+	
+function hideIdeas() {
+	var hides = [];
+	hides = [
+		{
+			'statusLog': 'Archived ideas',
+			'statusId': ARCHIVED_STATUS_ID,
+			'order': 'date_created ASC'
+		}
+	];
+	
+	processHides( hides, 0, 1, [] );
+};
+
+function processHides( hides, hide_index, page_index, idea_ids ){
+	var hide = hides[ hide_index ];
+	console.log("Let's get the list of " + hide.statusLog + " (page "+ page_index + ")...");
+	
+	// Look for ideas created at least 5 years ago
+	var date_cutoff = new Date();
+	date_cutoff.setFullYear( date_cutoff.getFullYear() - 10);
+	
+	var options = {
+		hostname: BRIGHTIDEA_HOST,
+		path: '/api3/idea?visible=1&status_id=' + hide.statusId +
+			'&order=' + encodeURIComponent( hide.order ) +
+			'&page_size=50&page=' + page_index,
+		method: 'GET',
+		headers: {
+			'Authorization': 'Bearer ' + BRIGHTIDEA_ACCESS_TOKEN
+		}
+	};
+	
+	var req = https.request( options , resDetails => {
+		resDetails.setEncoding( 'utf8' );
+		var data = '';
+		
+		resDetails.on('data', (d) => {
+			data = data + d;
+		});
+		
+		resDetails.on('end', () => {
+			data = JSON.parse(data);
+			var fetch_other_page = false;
+			
+			_.each(data.idea_list, function( idea ){
+				if ( new Date( idea.date_created ) <= date_cutoff ) {
+					fetch_other_page = true;
+					
+					idea_ids.push( idea.id );
+					console.log( "Found " + idea.idea_code + " submitted on " + idea.date_created + " with " + idea.chips + " chips.");
+					
+				} else {
+					fetch_other_page = false;
+				}
+			},this);
+			
+			if( fetch_other_page ) {
+				processHides( hides, hide_index, page_index + 1, idea_ids );
+			} else {
+				console.log( 'Found ' + idea_ids.length + ' ideas.' );
+				
+				if ( hide_index >= hides.length - 1 ) {
+					if ( _.contains( process.argv, SAFE_MODE_ARG  ) ) {
+						console.log( 'Done [SAFE MODE]' );
+					} else {
+						hideIdea( 0, idea_ids );
+					}
+				} else {
+					processHides( hides, hide_index + 1, 1, idea_ids );
+				}
+			}
+		});
+	} );
+
+	req.on( 'error' , function (e) {
+		console.log( 'problem with request: ' + e.message );
+	} );
+
+	req.end();
+};
+
+function hideIdea( index, idea_ids ){
+	if ( index >= idea_ids.length ) {
+		console.log('All done!');
+	} else {
+		console.log('Hiding idea #' + ( index + 1 ) + ' (' + idea_ids[ index ] + ')');
+	
+		var options = {
+			"method": "PUT",
+			"hostname": BRIGHTIDEA_HOST,
+			"path": "/api3/idea/" + encodeURIComponent( idea_ids[ index ] ) +
+				"?visible=0",
+			"headers": {
+				"authorization": "Bearer " + BRIGHTIDEA_ACCESS_TOKEN,
+				"content-type": "application/x-www-form-urlencoded",
+			}
+		};
+	
+		var req = https.request( options , resDetails => {
+			resDetails.setEncoding( 'utf8' );
+		
+			var data = '';
+		
+			resDetails.on('data', (d) => {
+				data = data + d;
+			});
+		
+			resDetails.on('end', () => {
+				data = JSON.parse(data);
+				hideIdea( index + 1, idea_ids );
+			});
+		} );
+
+		req.on( 'error' , function (e) {
+			console.log( 'problem with request: ' + e.message );
+		} );
+
+		req.end();
+	}
 };
