@@ -42,6 +42,9 @@ var MAX_IDEAS = 10;
 var REVIEWERS = [ 'Andrea', 'Dan', 'Marianne', 'Mia', 'Pam', 'William' ];
 var REVIEW_LIST_FILTE_PATH = 'review_list.tsv';
 
+// vars for hiding ideas
+var HIDE_YEAR_RANGE = 4;
+
 console.log("Let's get started!");
 console.log("First, let's read " + TOKEN_FILE_PATH + " for login info");
 
@@ -652,7 +655,7 @@ function processHides( hides, hide_index, page_index, idea_ids ){
 	
 	// Look for ideas created at least 5 years ago
 	var date_cutoff = new Date();
-	date_cutoff.setFullYear( date_cutoff.getFullYear() - 10);
+	date_cutoff.setFullYear( date_cutoff.getFullYear() - HIDE_YEAR_RANGE );
 	
 	var options = {
 		hostname: BRIGHTIDEA_HOST,
@@ -675,6 +678,12 @@ function processHides( hides, hide_index, page_index, idea_ids ){
 		
 		resDetails.on('end', () => {
 			data = JSON.parse(data);
+			
+			// Display an error if we get one
+			if( data.errorCode ) {
+				console.log( data );
+			}
+			
 			var fetch_other_page = false;
 			
 			_.each(data.idea_list, function( idea ){
